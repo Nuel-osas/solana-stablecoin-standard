@@ -150,7 +150,7 @@ solana-stablecoin-standard/
 │   ├── OPERATIONS.md
 │   ├── COMPLIANCE.md
 │   └── API.md
-└── scripts/                 # Deployment and utility scripts
+└── Anchor.toml              # Anchor workspace config
 ```
 
 ## Role-Based Access Control
@@ -212,4 +212,4 @@ MIT
 
 ## Contributing
 
-PRs welcome. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
+PRs welcome. Please open an issue first to discuss significant changes.
