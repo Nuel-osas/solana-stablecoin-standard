@@ -1,8 +1,15 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
+use spl_tlv_account_resolution::{
+    account::ExtraAccountMeta, seeds::Seed, state::ExtraAccountMetaList,
+};
 use spl_transfer_hook_interface::instruction::ExecuteInstruction;
 
 declare_id!("63pY5GPBHKJ3gu99xTNH9yxUKgp8kUowiiHYzZtaE31E");
+
+/// The sss-token program ID — blacklist PDAs are owned by this program.
+const SSS_TOKEN_PROGRAM_ID: Pubkey =
+    pubkey!("CmyUqWVb4agcavSybreJ7xb7WoKUyWhpkEc6f1DnMEGJ");
 
 /// Seeds used by the main sss-token program
 const STABLECOIN_SEED: &[u8] = b"stablecoin";
@@ -25,7 +32,7 @@ pub mod sss_transfer_hook {
         // Check source blacklist
         let (source_blacklist_pda, _) = Pubkey::find_program_address(
             &[BLACKLIST_SEED, stablecoin_key.as_ref(), source_owner.as_ref()],
-            &crate::id(), // main program id would be used in production
+            &SSS_TOKEN_PROGRAM_ID,
         );
 
         // If the source_blacklist account exists and matches the PDA, the source is blacklisted
@@ -38,7 +45,7 @@ pub mod sss_transfer_hook {
         // Check destination blacklist
         let (dest_blacklist_pda, _) = Pubkey::find_program_address(
             &[BLACKLIST_SEED, stablecoin_key.as_ref(), dest_owner.as_ref()],
-            &crate::id(),
+            &SSS_TOKEN_PROGRAM_ID,
         );
 
         if let Some(dest_bl) = &ctx.accounts.destination_blacklist {
@@ -56,9 +63,106 @@ pub mod sss_transfer_hook {
     pub fn initialize_extra_account_meta_list(
         ctx: Context<InitializeExtraAccountMetaList>,
     ) -> Result<()> {
-        // In a full implementation, this would write the ExtraAccountMetaList
-        // to specify which additional accounts the transfer hook needs.
-        // For now, we initialize the account.
+        // Define the extra accounts the transfer hook expects beyond the
+        // standard source / mint / destination / authority:
+        //
+        // 1. Stablecoin config PDA — derived from [b"stablecoin", mint]
+        //    using the sss-token program.
+        // 2. Source blacklist PDA — derived from [b"blacklist", stablecoin, source_owner]
+        //    using the sss-token program.  (Optional at runtime, but must be
+        //    declared so Token-2022 knows the account position.)
+        // 3. Destination blacklist PDA — same derivation with dest_owner.
+
+        // Account indices in the combined list (4 fixed + extras):
+        //   0 = source token account
+        //   1 = mint
+        //   2 = destination token account
+        //   3 = authority (source owner)
+        //   4 = extra[0]: sss-token program ID (needed as program for PDA derivation)
+        //   5 = extra[1]: stablecoin config PDA
+        //   6 = extra[2]: source blacklist PDA
+        //   7 = extra[3]: destination blacklist PDA
+        let extra_account_metas = &[
+            // extra[0]: sss-token program ID as a fixed pubkey account
+            ExtraAccountMeta::new_with_pubkey(&SSS_TOKEN_PROGRAM_ID, false, false)
+                .map_err(|_| ProgramError::InvalidArgument)?,
+            // extra[1]: stablecoin config PDA
+            // seeds: [b"stablecoin", mint.key()], program = extra[0] (abs index 4)
+            ExtraAccountMeta::new_external_pda_with_seeds(
+                4, // abs index of sss-token program
+                &[
+                    Seed::Literal {
+                        bytes: STABLECOIN_SEED.to_vec(),
+                    },
+                    Seed::AccountKey { index: 1 }, // mint
+                ],
+                false,
+                false,
+            )
+            .map_err(|_| ProgramError::InvalidArgument)?,
+            // extra[2]: source blacklist PDA
+            // seeds: [b"blacklist", stablecoin.key(), authority.key()], program = extra[0]
+            ExtraAccountMeta::new_external_pda_with_seeds(
+                4,
+                &[
+                    Seed::Literal {
+                        bytes: BLACKLIST_SEED.to_vec(),
+                    },
+                    Seed::AccountKey { index: 5 }, // stablecoin (abs index 5)
+                    Seed::AccountKey { index: 3 }, // authority / source owner
+                ],
+                false,
+                false,
+            )
+            .map_err(|_| ProgramError::InvalidArgument)?,
+            // extra[3]: destination blacklist PDA
+            // seeds: [b"blacklist", stablecoin.key(), destination.key()], program = extra[0]
+            ExtraAccountMeta::new_external_pda_with_seeds(
+                4,
+                &[
+                    Seed::Literal {
+                        bytes: BLACKLIST_SEED.to_vec(),
+                    },
+                    Seed::AccountKey { index: 5 }, // stablecoin (abs index 5)
+                    Seed::AccountKey { index: 2 }, // destination token account
+                ],
+                false,
+                false,
+            )
+            .map_err(|_| ProgramError::InvalidArgument)?,
+        ];
+
+        // Compute required space and initialize.
+        let account_size = ExtraAccountMetaList::size_of(extra_account_metas.len())?;
+        let lamports = Rent::get()?.minimum_balance(account_size);
+
+        let mint_key = ctx.accounts.mint.key();
+        let signer_seeds: &[&[u8]] = &[b"extra-account-metas", mint_key.as_ref()];
+        let (_, bump) = Pubkey::find_program_address(signer_seeds, &crate::id());
+        let signer_seeds_with_bump: &[&[u8]] =
+            &[b"extra-account-metas", mint_key.as_ref(), &[bump]];
+
+        // Create the account if needed (CPI to system program).
+        system_program::create_account(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::CreateAccount {
+                    from: ctx.accounts.payer.to_account_info(),
+                    to: ctx.accounts.extra_account_meta_list.to_account_info(),
+                },
+                &[signer_seeds_with_bump],
+            ),
+            lamports,
+            account_size as u64,
+            &crate::id(),
+        )?;
+
+        // Write the list into the newly created account.
+        ExtraAccountMetaList::init::<ExecuteInstruction>(
+            &mut ctx.accounts.extra_account_meta_list.try_borrow_mut_data()?,
+            extra_account_metas,
+        )?;
+
         msg!("Extra account meta list initialized");
         Ok(())
     }

@@ -112,9 +112,8 @@ pub fn handler(ctx: Context<Initialize>, config: StablecoinInitConfig) -> Result
     }
 
     // Initialize the mint
-    let stablecoin_key = ctx.accounts.stablecoin.key();
-    let seeds = &[STABLECOIN_SEED, stablecoin_key.as_ref()];
-    let (_, bump) = Pubkey::find_program_address(seeds, ctx.program_id);
+    // Use the bump Anchor already computed for the stablecoin PDA
+    let bump = ctx.bumps.stablecoin;
 
     token_2022::initialize_mint2(
         CpiContext::new(

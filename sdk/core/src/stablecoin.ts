@@ -118,7 +118,7 @@ export class SolanaStablecoin {
   /**
    * Mint tokens to a recipient.
    */
-  async mint(params: MintParams): Promise<string> {
+  async mintTokens(params: MintParams): Promise<string> {
     const [rolePDA] = findRolePDA(
       this.stablecoinPDA,
       "minter",
