@@ -30,9 +30,18 @@ pub fn handler(ctx: Context<Initialize>, config: StablecoinInitConfig) -> Result
         extensions.push(ExtensionType::DefaultAccountState);
     }
 
-    // Calculate space needed for mint with extensions
+    // Calculate space needed for mint with extensions (without metadata content)
     let space = ExtensionType::try_calculate_account_len::<MintState>(&extensions)?;
-    let lamports = Rent::get()?.minimum_balance(space);
+
+    // The token metadata initialize instruction will realloc the mint account
+    // to store name/symbol/uri. We must pre-fund enough lamports for the final
+    // size, otherwise the transaction fails with "insufficient funds for rent".
+    let metadata_content_space = 4 + 4 + 32 + 32
+        + (4 + config.name.len())
+        + (4 + config.symbol.len())
+        + (4 + config.uri.len())
+        + 4;
+    let lamports = Rent::get()?.minimum_balance(space + metadata_content_space);
 
     // Create the mint account
     anchor_lang::system_program::create_account(
