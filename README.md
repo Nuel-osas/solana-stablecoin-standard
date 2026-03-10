@@ -117,7 +117,7 @@ const custom = await SolanaStablecoin.create(connection, {
 });
 
 // Operations
-await stable.mint({ recipient, amount: 1_000_000, minter });
+await stable.mintTokens({ recipient, amount: 1_000_000, minter });
 await stable.compliance.blacklistAdd(address, "Sanctions match");
 await stable.compliance.seize(frozenAccount, treasury);
 const supply = await stable.getTotalSupply();

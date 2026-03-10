@@ -55,7 +55,7 @@ const stable = await SolanaStablecoin.create(connection, {
 ### Mint
 
 ```typescript
-await stable.mint({
+await stable.mintTokens({
   recipient: userPublicKey,
   amount: 1_000_000, // 1 token with 6 decimals
   minter: minterKeypair,
