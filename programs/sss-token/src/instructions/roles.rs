@@ -1,0 +1,184 @@
+use anchor_lang::prelude::*;
+
+use crate::constants::*;
+use crate::error::SSSError;
+use crate::events;
+use crate::state::*;
+
+pub fn assign_role_handler(ctx: Context<AssignRole>, role: Role, assignee: Pubkey) -> Result<()> {
+    let stablecoin = &ctx.accounts.stablecoin;
+    require!(
+        ctx.accounts.authority.key() == stablecoin.authority,
+        SSSError::Unauthorized
+    );
+
+    // If compliance role (blacklister/seizer) check that compliance is enabled
+    if matches!(role, Role::Blacklister | Role::Seizer) {
+        require!(stablecoin.is_compliance_enabled(), SSSError::ComplianceNotEnabled);
+    }
+
+    let role_assignment = &mut ctx.accounts.role_assignment;
+    role_assignment.stablecoin = stablecoin.key();
+    role_assignment.role = role;
+    role_assignment.assignee = assignee;
+    role_assignment.active = true;
+    role_assignment.bump = ctx.bumps.role_assignment;
+
+    emit!(events::RoleAssigned {
+        mint: stablecoin.mint,
+        role: role.to_string(),
+        assignee,
+        by: ctx.accounts.authority.key(),
+    });
+
+    // If assigning minter role, also initialize minter info
+    if role == Role::Minter {
+        if let Some(minter_info) = &mut ctx.accounts.minter_info {
+            minter_info.stablecoin = stablecoin.key();
+            minter_info.minter = assignee;
+            minter_info.quota = 0; // unlimited by default
+            minter_info.minted = 0;
+            minter_info.bump = ctx.bumps.minter_info.unwrap_or(0);
+        }
+    }
+
+    Ok(())
+}
+
+pub fn revoke_role_handler(ctx: Context<RevokeRole>, _role: Role, _assignee: Pubkey) -> Result<()> {
+    let stablecoin = &ctx.accounts.stablecoin;
+    require!(
+        ctx.accounts.authority.key() == stablecoin.authority,
+        SSSError::Unauthorized
+    );
+
+    let role_assignment = &mut ctx.accounts.role_assignment;
+    role_assignment.active = false;
+
+    emit!(events::RoleRevoked {
+        mint: stablecoin.mint,
+        role: role_assignment.role.to_string(),
+        assignee: role_assignment.assignee,
+        by: ctx.accounts.authority.key(),
+    });
+
+    Ok(())
+}
+
+pub fn transfer_authority_handler(ctx: Context<TransferAuthority>, new_authority: Pubkey) -> Result<()> {
+    let stablecoin = &mut ctx.accounts.stablecoin;
+    require!(
+        ctx.accounts.authority.key() == stablecoin.authority,
+        SSSError::Unauthorized
+    );
+
+    let old_authority = stablecoin.authority;
+    stablecoin.authority = new_authority;
+
+    emit!(events::AuthorityTransferred {
+        mint: stablecoin.mint,
+        old_authority,
+        new_authority,
+    });
+
+    Ok(())
+}
+
+pub fn update_minter_quota_handler(ctx: Context<UpdateMinterQuota>, new_quota: u64) -> Result<()> {
+    let stablecoin = &ctx.accounts.stablecoin;
+    require!(
+        ctx.accounts.authority.key() == stablecoin.authority,
+        SSSError::Unauthorized
+    );
+
+    let minter_info = &mut ctx.accounts.minter_info;
+    minter_info.quota = new_quota;
+
+    Ok(())
+}
+
+#[derive(Accounts)]
+#[instruction(role: Role, assignee: Pubkey)]
+pub struct AssignRole<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [STABLECOIN_SEED, stablecoin.mint.as_ref()],
+        bump = stablecoin.bump,
+    )]
+    pub stablecoin: Account<'info, Stablecoin>,
+
+    #[account(
+        init_if_needed,
+        payer = authority,
+        space = RoleAssignment::LEN,
+        seeds = [ROLE_SEED, stablecoin.key().as_ref(), role.to_seed(), assignee.as_ref()],
+        bump,
+    )]
+    pub role_assignment: Account<'info, RoleAssignment>,
+
+    /// Optional: minter info (only needed when assigning minter role)
+    #[account(
+        init_if_needed,
+        payer = authority,
+        space = MinterInfo::LEN,
+        seeds = [MINTER_INFO_SEED, stablecoin.key().as_ref(), assignee.as_ref()],
+        bump,
+    )]
+    pub minter_info: Option<Account<'info, MinterInfo>>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(role: Role, assignee: Pubkey)]
+pub struct RevokeRole<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [STABLECOIN_SEED, stablecoin.mint.as_ref()],
+        bump = stablecoin.bump,
+    )]
+    pub stablecoin: Account<'info, Stablecoin>,
+
+    #[account(
+        mut,
+        seeds = [ROLE_SEED, stablecoin.key().as_ref(), role.to_seed(), assignee.as_ref()],
+        bump = role_assignment.bump,
+    )]
+    pub role_assignment: Account<'info, RoleAssignment>,
+}
+
+#[derive(Accounts)]
+pub struct TransferAuthority<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [STABLECOIN_SEED, stablecoin.mint.as_ref()],
+        bump = stablecoin.bump,
+    )]
+    pub stablecoin: Account<'info, Stablecoin>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateMinterQuota<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [STABLECOIN_SEED, stablecoin.mint.as_ref()],
+        bump = stablecoin.bump,
+    )]
+    pub stablecoin: Account<'info, Stablecoin>,
+
+    #[account(
+        mut,
+        seeds = [MINTER_INFO_SEED, stablecoin.key().as_ref(), minter_info.minter.as_ref()],
+        bump = minter_info.bump,
+    )]
+    pub minter_info: Account<'info, MinterInfo>,
+}

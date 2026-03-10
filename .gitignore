@@ -1,0 +1,11 @@
+node_modules/
+dist/
+target/
+.anchor/
+test-ledger/
+.DS_Store
+*.so
+*.dylib
+yarn-error.log
+.env
+.env.local

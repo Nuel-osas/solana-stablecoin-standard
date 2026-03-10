@@ -1,0 +1,24 @@
+[package]
+name = "sss-transfer-hook"
+version = "0.1.0"
+description = "SSS Transfer Hook: Enforces blacklist checks on every Token-2022 transfer"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "sss_transfer_hook"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1" }
+anchor-spl = { version = "0.31.1", features = ["token_2022"] }
+spl-transfer-hook-interface = "0.10.0"
+spl-tlv-account-resolution = "0.10.0"

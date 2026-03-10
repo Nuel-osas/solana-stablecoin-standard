@@ -1,0 +1,30 @@
+{
+  "name": "@stbr/solana-stablecoin-standard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Solana Stablecoin Standard (SSS) — Modular SDK with opinionated presets for stablecoin architectures on Solana",
+  "workspaces": [
+    "sdk/core"
+  ],
+  "scripts": {
+    "build": "yarn workspaces foreach -A run build",
+    "test": "anchor test",
+    "test:local": "anchor test --skip-local-validator",
+    "test:sdk": "yarn workspaces foreach -A run test",
+    "clean": "yarn workspaces foreach -A run clean",
+    "cli": "npx ts-node cli/src/index.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@solana/spl-token": "^0.4.10",
+    "@solana/web3.js": "^1.98.0"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "chai": "^4.5.0",
+    "mocha": "^10.8.2",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.7.3"
+  }
+}

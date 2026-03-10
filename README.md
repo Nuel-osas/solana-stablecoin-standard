@@ -1,0 +1,202 @@
+# Solana Stablecoin Standard (SSS)
+
+A modular SDK with opinionated presets covering the most common stablecoin architectures on Solana. Built on Token-2022 extensions.
+
+Think **OpenZeppelin for stablecoins**: the library is the SDK, the standards (SSS-1, SSS-2) are opinionated presets that get adopted.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│              Layer 3 — Standard Presets          │
+│  SSS-1 (Minimal)    SSS-2 (Compliant)           │
+├─────────────────────────────────────────────────┤
+│              Layer 2 — Modules                   │
+│  Compliance Module    Privacy Module (SSS-3)     │
+│  (Transfer Hook, Blacklist, Permanent Delegate)  │
+├─────────────────────────────────────────────────┤
+│              Layer 1 — Base SDK                  │
+│  Token Creation · Mint/Freeze Authority          │
+│  Role Management · CLI · TypeScript SDK          │
+└─────────────────────────────────────────────────┘
+```
+
+## Standards
+
+| Standard | Name | Description |
+|----------|------|-------------|
+| **SSS-1** | Minimal Stablecoin | Mint authority + freeze authority + metadata. What's needed on every stable, nothing more. |
+| **SSS-2** | Compliant Stablecoin | SSS-1 + permanent delegate + transfer hook + blacklist enforcement. USDC/USDT-class compliance. |
+| **SSS-3** | Private Stablecoin | Confidential transfers + scoped allowlists. Experimental proof-of-concept. |
+
+## Quick Start
+
+### Initialize a stablecoin
+
+```bash
+# SSS-1: Minimal
+sss-token init sss-1 --name "My Stablecoin" --symbol "MUSD" --decimals 6
+
+# SSS-2: Compliant
+sss-token init sss-2 --name "Regulated USD" --symbol "RUSD" --decimals 6
+
+# Custom config
+sss-token init custom --config config.toml
+```
+
+### Operations
+
+```bash
+# Mint tokens
+sss-token mint --to <recipient> --amount 1000000
+
+# Burn tokens
+sss-token burn --amount 500000
+
+# Freeze/thaw accounts
+sss-token freeze --account <address>
+sss-token thaw --account <address>
+
+# Pause/unpause all operations
+sss-token pause
+sss-token unpause
+
+# Check status
+sss-token status
+sss-token supply
+```
+
+### SSS-2 Compliance
+
+```bash
+# Blacklist management
+sss-token blacklist add --address <address> --reason "OFAC match"
+sss-token blacklist remove --address <address>
+
+# Seize tokens (via permanent delegate)
+sss-token seize --from <address> --to <treasury>
+
+# Minter management
+sss-token minters list
+sss-token minters add --address <address> --quota 1000000
+sss-token minters remove --address <address>
+
+# Audit
+sss-token audit-log --action mint
+sss-token holders --min-balance 1000
+```
+
+### TypeScript SDK
+
+```typescript
+import { SolanaStablecoin, Presets } from "@stbr/sss-token";
+
+// SSS-2 preset
+const stable = await SolanaStablecoin.create(connection, {
+  preset: Presets.SSS_2,
+  name: "My Stablecoin",
+  symbol: "MYUSD",
+  decimals: 6,
+  authority: adminKeypair,
+});
+
+// Or custom config
+const custom = await SolanaStablecoin.create(connection, {
+  name: "Custom Stable",
+  symbol: "CUSD",
+  extensions: { permanentDelegate: true, transferHook: false },
+});
+
+// Operations
+await stable.mint({ recipient, amount: 1_000_000, minter });
+await stable.compliance.blacklistAdd(address, "Sanctions match");
+await stable.compliance.seize(frozenAccount, treasury);
+const supply = await stable.getTotalSupply();
+```
+
+## Project Structure
+
+```
+solana-stablecoin-standard/
+├── programs/
+│   ├── sss-token/           # Core Anchor program (SSS-1 + SSS-2)
+│   │   └── src/
+│   │       ├── lib.rs        # Program entrypoint
+│   │       ├── state.rs      # Account definitions
+│   │       ├── instructions/ # All instruction handlers
+│   │       ├── error.rs      # Error codes
+│   │       ├── events.rs     # Event definitions
+│   │       └── constants.rs  # Seeds and limits
+│   └── sss-transfer-hook/   # Transfer hook program (SSS-2 blacklist enforcement)
+├── sdk/
+│   └── core/                # TypeScript SDK (@stbr/sss-token)
+├── cli/                     # Admin CLI (sss-token)
+├── backend/                 # Backend services (Docker)
+├── tests/                   # Integration tests
+├── docs/                    # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── SSS-1.md
+│   ├── SSS-2.md
+│   ├── SDK.md
+│   ├── OPERATIONS.md
+│   ├── COMPLIANCE.md
+│   └── API.md
+└── scripts/                 # Deployment and utility scripts
+```
+
+## Role-Based Access Control
+
+No single key controls everything:
+
+| Role | Capabilities |
+|------|-------------|
+| **Master Authority** | Assign/revoke all roles, transfer authority |
+| **Minter** | Mint tokens (with per-minter quotas) |
+| **Burner** | Burn tokens |
+| **Pauser** | Pause/unpause, freeze/thaw accounts |
+| **Blacklister** | Add/remove from blacklist (SSS-2) |
+| **Seizer** | Seize tokens via permanent delegate (SSS-2) |
+
+## Token-2022 Extensions Used
+
+| Extension | SSS-1 | SSS-2 | Purpose |
+|-----------|-------|-------|---------|
+| Metadata Pointer | ✓ | ✓ | On-chain metadata |
+| Mint/Freeze Authority | ✓ | ✓ | Token control |
+| Permanent Delegate | | ✓ | Token seizure |
+| Transfer Hook | | ✓ | Blacklist enforcement on every transfer |
+| Default Account State | | Optional | Freeze new accounts by default |
+
+## Development
+
+```bash
+# Install dependencies
+yarn install
+
+# Build programs
+anchor build
+
+# Run tests
+anchor test
+
+# Build SDK
+cd sdk/core && yarn build
+```
+
+## Devnet Deployment
+
+```bash
+# Deploy to devnet
+solana config set --url devnet
+anchor deploy --provider.cluster devnet
+
+# Program IDs will be output after deployment
+```
+
+## License
+
+MIT
+
+## Contributing
+
+PRs welcome. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.

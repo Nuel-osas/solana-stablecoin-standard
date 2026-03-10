@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - SOLANA_RPC_URL=${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      - PROGRAM_ID=${PROGRAM_ID}
+      - STABLECOIN_MINT=${STABLECOIN_MINT}
+      - PORT=3000
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  indexer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["node", "dist/indexer.js"]
+    environment:
+      - SOLANA_RPC_URL=${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      - PROGRAM_ID=${PROGRAM_ID}
+      - STABLECOIN_MINT=${STABLECOIN_MINT}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=production
+    restart: unless-stopped
