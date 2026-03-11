@@ -79,12 +79,16 @@ pub struct RoleAssignment {
     pub assignee: Pubkey,
     /// Whether the role is active
     pub active: bool,
+    /// Who granted this role
+    pub granted_by: Pubkey,
+    /// When the role was granted (unix timestamp)
+    pub granted_at: i64,
     /// PDA bump
     pub bump: u8,
 }
 
 impl RoleAssignment {
-    pub const LEN: usize = 8 + 32 + 1 + 32 + 1 + 1;
+    pub const LEN: usize = 8 + 32 + 1 + 32 + 1 + 32 + 8 + 1;
 }
 
 /// Per-minter info (tracks quota usage).

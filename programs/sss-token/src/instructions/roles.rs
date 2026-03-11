@@ -22,6 +22,8 @@ pub fn assign_role_handler(ctx: Context<AssignRole>, role: Role, assignee: Pubke
     role_assignment.role = role;
     role_assignment.assignee = assignee;
     role_assignment.active = true;
+    role_assignment.granted_by = ctx.accounts.authority.key();
+    role_assignment.granted_at = Clock::get()?.unix_timestamp;
     role_assignment.bump = ctx.bumps.role_assignment;
 
     emit!(events::RoleAssigned {
