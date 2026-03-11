@@ -7,6 +7,7 @@ pub mod roles;
 pub mod compliance;
 pub mod allowlist;
 pub mod oracle;
+pub mod metadata;
 
 pub use initialize::*;
 pub use mint::*;
@@ -17,3 +18,4 @@ pub use roles::*;
 pub use compliance::*;
 pub use allowlist::*;
 pub use oracle::*;
+pub use metadata::*;

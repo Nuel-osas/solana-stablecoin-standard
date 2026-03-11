@@ -146,6 +146,15 @@ pub mod sss_token {
         instructions::allowlist::remove_from_allowlist_handler(ctx, address)
     }
 
+    // ============ Metadata Management ============
+
+    /// Update the stablecoin's metadata URI. Only master authority.
+    /// Name and symbol are immutable after initialization to prevent
+    /// ticker confusion for wallets, explorers, and holders.
+    pub fn update_metadata(ctx: Context<UpdateMetadata>, uri: String) -> Result<()> {
+        instructions::metadata::update_metadata_handler(ctx, uri)
+    }
+
     // ============ Oracle Price Enforcement ============
 
     /// Configure oracle price enforcement for mint/burn operations.

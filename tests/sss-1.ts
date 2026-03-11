@@ -134,6 +134,8 @@ describe("SSS-1: Minimal Stablecoin", () => {
     const role = await program.account.roleAssignment.fetch(minterRolePDA);
     expect(role.active).to.be.true;
     expect(role.assignee.toBase58()).to.equal(minterKeypair.publicKey.toBase58());
+    expect(role.grantedBy.toBase58()).to.equal(authority.publicKey.toBase58());
+    expect(role.grantedAt.toNumber()).to.be.greaterThan(0);
   });
 
   it("mints tokens to recipient", async () => {
@@ -346,6 +348,70 @@ describe("SSS-1: Minimal Stablecoin", () => {
 
     stablecoin = await program.account.stablecoin.fetch(stablecoinPDA);
     expect(stablecoin.paused).to.be.false;
+  });
+
+  // ============ Metadata Update ============
+
+  it("updates metadata URI", async () => {
+    const newUri = "https://example.com/updated-metadata.json";
+
+    // Fund the mint account for potential realloc (longer URI needs more rent)
+    const fundMintTx = new anchor.web3.Transaction();
+    fundMintTx.add(
+      SystemProgram.transfer({
+        fromPubkey: authority.publicKey,
+        toPubkey: mintKeypair.publicKey,
+        lamports: LAMPORTS_PER_SOL / 10,
+      })
+    );
+    await provider.sendAndConfirm(fundMintTx);
+
+    const tx = await program.methods
+      .updateMetadata(newUri)
+      .accounts({
+        authority: authority.publicKey,
+        mint: mintKeypair.publicKey,
+        stablecoin: stablecoinPDA,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .rpc();
+    console.log("  Update metadata URI tx:", tx);
+
+    const stablecoin = await program.account.stablecoin.fetch(stablecoinPDA);
+    expect(stablecoin.uri).to.equal(newUri);
+  });
+
+  it("rejects metadata update from non-authority", async () => {
+    const nonAuthority = Keypair.generate();
+
+    // Fund the non-authority
+    const fundTx = new anchor.web3.Transaction();
+    fundTx.add(
+      SystemProgram.transfer({
+        fromPubkey: authority.publicKey,
+        toPubkey: nonAuthority.publicKey,
+        lamports: LAMPORTS_PER_SOL / 10,
+      })
+    );
+    await provider.sendAndConfirm(fundTx);
+
+    try {
+      await program.methods
+        .updateMetadata("https://evil.com/rug.json")
+        .accounts({
+          authority: nonAuthority.publicKey,
+          mint: mintKeypair.publicKey,
+          stablecoin: stablecoinPDA,
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
+        })
+        .signers([nonAuthority])
+        .rpc();
+      expect.fail("Should have thrown");
+    } catch (err: any) {
+      expect(err.error?.errorCode?.code || err.message).to.satisfy(
+        (v: string) => v.includes("Unauthorized") || v.includes("ConstraintHasOne") || v.includes("2012")
+      );
+    }
   });
 
   it("transfers authority", async () => {

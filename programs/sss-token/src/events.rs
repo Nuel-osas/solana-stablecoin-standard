@@ -146,6 +146,14 @@ pub struct TokensSeized {
 }
 
 #[event]
+pub struct MetadataUpdated {
+    pub mint: Pubkey,
+    pub uri: String,
+    pub by: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
 pub struct OracleConfigured {
     pub mint: Pubkey,
     pub price_feed: Pubkey,
