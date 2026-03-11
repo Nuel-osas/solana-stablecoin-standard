@@ -13,10 +13,10 @@
     "test:local": "anchor test --skip-local-validator",
     "test:sdk": "yarn workspaces run test",
     "test:ct": "./scripts/test-confidential-transfer.sh",
-    "test:oracle:devnet": "npx ts-node scripts/test-oracle.ts",
+    "test:oracle:devnet": "ts-node scripts/test-oracle.ts",
     "clean": "yarn workspaces run clean",
-    "cli": "npx ts-node cli/src/index.ts",
-    "tui": "cd tui && npx ts-node src/index.ts"
+    "cli": "ts-node cli/src/index.ts",
+    "tui": "cd tui && ts-node src/index.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
