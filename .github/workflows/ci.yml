@@ -52,7 +52,7 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build programs
-        run: anchor build
+        run: anchor build -- --tools-version v1.52
 
       - name: Upload built programs
         uses: actions/upload-artifact@v4
@@ -104,7 +104,7 @@ jobs:
         run: solana-keygen new --no-bip39-passphrase
 
       - name: Run Anchor tests
-        run: anchor test
+        run: anchor test -- --tools-version v1.52
 
   # Job 3: SDK unit tests
   sdk-test:
