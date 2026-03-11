@@ -10,8 +10,22 @@ import { createDashboard } from "./dashboard";
 
 const idl = require("./idl/sss_token.json");
 
+// Load program ID from root .env, env var, or fall back to default
+function loadRootEnv(): Record<string, string> {
+  const vars: Record<string, string> = {};
+  try {
+    const envPath = path.resolve(__dirname, "../../.env");
+    for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
+      const m = line.match(/^([A-Z_]+)=(.+)$/);
+      if (m) vars[m[1]] = m[2].trim();
+    }
+  } catch {}
+  return vars;
+}
+const _env = loadRootEnv();
+
 const PROGRAM_ID = new PublicKey(
-  "BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq"
+  process.env.SSS_TOKEN_PROGRAM_ID || _env.SSS_TOKEN_PROGRAM_ID || "BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq"
 );
 
 const cli = new Command();

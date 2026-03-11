@@ -51,11 +51,25 @@ import * as path from "path";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const idl = require("./idl/sss_token.json");
 
+// Load program IDs from root .env, env vars, or fall back to defaults
+function loadRootEnv(): Record<string, string> {
+  const vars: Record<string, string> = {};
+  try {
+    const envPath = path.resolve(__dirname, "../../.env");
+    for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
+      const m = line.match(/^([A-Z_]+)=(.+)$/);
+      if (m) vars[m[1]] = m[2].trim();
+    }
+  } catch {}
+  return vars;
+}
+const _env = loadRootEnv();
+
 const PROGRAM_ID = new PublicKey(
-  "BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq"
+  process.env.SSS_TOKEN_PROGRAM_ID || _env.SSS_TOKEN_PROGRAM_ID || "BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq"
 );
 const TRANSFER_HOOK_PROGRAM_ID = new PublicKey(
-  "B9HzG9fuxbuJBG2wTSP6UmxBSQLdaUAk62Kcdf41WxAt"
+  process.env.SSS_TRANSFER_HOOK_PROGRAM_ID || _env.SSS_TRANSFER_HOOK_PROGRAM_ID || "B9HzG9fuxbuJBG2wTSP6UmxBSQLdaUAk62Kcdf41WxAt"
 );
 
 const cli = new Command();

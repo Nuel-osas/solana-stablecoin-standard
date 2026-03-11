@@ -1,11 +1,19 @@
 import { PublicKey } from "@solana/web3.js";
 
+// Injected by vite.config.ts from root .env — fall back to defaults
+declare const __SSS_TOKEN_PROGRAM_ID__: string;
+declare const __SSS_TRANSFER_HOOK_PROGRAM_ID__: string;
+
 export const SSS_TOKEN_PROGRAM_ID = new PublicKey(
-  "BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq"
+  typeof __SSS_TOKEN_PROGRAM_ID__ !== "undefined"
+    ? __SSS_TOKEN_PROGRAM_ID__
+    : "BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq"
 );
 
 export const SSS_TRANSFER_HOOK_PROGRAM_ID = new PublicKey(
-  "B9HzG9fuxbuJBG2wTSP6UmxBSQLdaUAk62Kcdf41WxAt"
+  typeof __SSS_TRANSFER_HOOK_PROGRAM_ID__ !== "undefined"
+    ? __SSS_TRANSFER_HOOK_PROGRAM_ID__
+    : "B9HzG9fuxbuJBG2wTSP6UmxBSQLdaUAk62Kcdf41WxAt"
 );
 
 export function deriveStablecoinPDA(mint: PublicKey): [PublicKey, number] {
