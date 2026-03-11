@@ -62,7 +62,7 @@ The `ConfidentialTransferMint` Token-2022 extension is initialized on SSS-3 mint
 
 #### Localnet Testing Results — Full CT Flow Verified
 
-We tested the **complete confidential transfer flow** on localnet by building Token-2022 v10.0.0 from source with the `zk-ops` feature flag enabled and loading it into the test validator via `--bpf-program`. Every step works end-to-end:
+We tested the confidential transfer mechanics on localnet in two phases. Phase 1 (`anchor test`) verifies our SSS-3 program provisions mints with the `ConfidentialTransferMint` extension. Phase 2 builds Token-2022 v10.0.0 from source with `zk-ops` and runs the full CT flow (deposit → ZK transfer → withdraw) using a standalone v10 mint. Phase 2 uses a separate mint because our program depends on Token-2022 v6 via `anchor-spl` — the phases will unify when the Anchor ecosystem upgrades to v10. Results:
 
 | Step | Status | Details |
 |------|--------|---------|

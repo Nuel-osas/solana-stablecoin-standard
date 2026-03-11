@@ -240,9 +240,9 @@ Master authority can also perform any role's action directly without needing a r
 
 ## SSS-3 Confidential Transfer (Verified on Localnet)
 
-SSS-3 initializes the `ConfidentialTransferMint` extension on the mint, enabling ZK-encrypted confidential transfers. We verified the **complete CT flow** on localnet by building Token-2022 v10.0.0 from source with `zk-ops` enabled.
+SSS-3 initializes the `ConfidentialTransferMint` extension on the mint, enabling ZK-encrypted confidential transfers. We verified the CT mechanics on localnet in two phases: (1) our Anchor program provisions mints with the CT extension, and (2) the full CT flow (deposit → ZK transfer → withdraw) works using Token-2022 v10.0.0 built from source. Phase 2 uses a standalone v10 mint because our program depends on Token-2022 v6 via `anchor-spl` — the two phases will unify when the Anchor ecosystem upgrades to v10.
 
-### Full CT Flow — All Steps Working
+### CT Verification — Two-Phase Results
 
 | Step | Status | Notes |
 |------|--------|-------|
