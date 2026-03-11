@@ -41,70 +41,74 @@ Both programs are live on Solana Devnet:
 
 ## Quick Start
 
+```bash
+yarn install
+yarn cli --help
+```
+
+> In this repo, the CLI is invoked via `yarn cli -- <command>`. All examples below use this form.
+
 ### Initialize a stablecoin
 
 ```bash
 # SSS-1: Minimal
-sss-token init sss-1 --name "My Stablecoin" --symbol "MUSD" --decimals 6
+yarn cli -- init sss-1 --name "My Stablecoin" --symbol "MUSD" --decimals 6
 
 # SSS-2: Compliant
-sss-token init sss-2 --name "Regulated USD" --symbol "RUSD" --decimals 6
+yarn cli -- init sss-2 --name "Regulated USD" --symbol "RUSD" --decimals 6
 
 # SSS-3: Private (allowlist-gated)
-sss-token init sss-3 --name "Private USD" --symbol "PUSD" --decimals 6
-
-# Custom config
-sss-token init custom --config config.toml
+yarn cli -- init sss-3 --name "Private USD" --symbol "PUSD" --decimals 6
 ```
 
 ### Operations
 
 ```bash
 # Mint tokens
-sss-token mint --to <recipient> --amount 1000000 --mint <address>
+yarn cli -- mint --to <recipient> --amount 1000000 --mint <address>
 
 # Burn tokens
-sss-token burn --amount 500000 --mint <address>
+yarn cli -- burn --amount 500000 --mint <address>
 
 # Freeze/thaw accounts
-sss-token freeze --account <address> --mint <address>
-sss-token thaw --account <address> --mint <address>
+yarn cli -- freeze --account <address> --mint <address>
+yarn cli -- thaw --account <address> --mint <address>
 
 # Pause/unpause all operations
-sss-token pause --mint <address>
-sss-token unpause --mint <address>
+yarn cli -- pause --mint <address>
+yarn cli -- unpause --mint <address>
 
 # Check status
-sss-token status --mint <address>
-sss-token supply --mint <address>
+yarn cli -- status --mint <address>
+yarn cli -- supply --mint <address>
 ```
 
 ### SSS-2 Compliance
 
 ```bash
 # Blacklist management
-sss-token blacklist add --address <address> --reason "OFAC match" --mint <address>
-sss-token blacklist remove --address <address> --mint <address>
+yarn cli -- blacklist add --address <address> --reason "OFAC match" --mint <address>
+yarn cli -- blacklist remove --address <address> --mint <address>
 
 # Seize tokens (via permanent delegate)
-sss-token seize --from <token-account> --to <treasury> --mint <address>
+yarn cli -- seize --from <token-account> --to <treasury> --mint <address>
 
 # Minter management
-sss-token minters list --mint <address>
-sss-token minters add --address <address> --mint <address>
-sss-token minters remove --address <address> --mint <address>
+yarn cli -- minters list --mint <address>
+yarn cli -- minters add --address <address> --mint <address>
+yarn cli -- minters remove --address <address> --mint <address>
 
 # Audit
-sss-token audit-log --mint <address>
-sss-token holders --mint <address>
+yarn cli -- audit-log --mint <address>
+yarn cli -- holders --mint <address>
 ```
 
 ### SSS-3 Allowlist
 
 ```bash
 # Allowlist management (authority-only)
-sss-token allowlist add --address <address> --mint <address>
-sss-token allowlist remove --address <address> --mint <address>
+yarn cli -- allowlist add --address <address> --mint <address>
+yarn cli -- allowlist remove --address <address> --mint <address>
 ```
 
 ### TypeScript SDK
@@ -235,14 +239,14 @@ Optional on-chain price validation during mint/burn operations. When configured,
 
 ```bash
 # Configure oracle (authority-only)
-yarn cli configure-oracle \
+yarn cli -- configure-oracle \
   --mint <address> \
   --price-feed <pyth-account> \
-  --max-deviation 100 \    # 1% max deviation from $1.00
-  --max-staleness 60       # reject prices older than 60s
+  --max-deviation 100 \
+  --max-staleness 60
 
 # Disable oracle enforcement
-yarn cli configure-oracle --mint <address> --price-feed <pyth-account> --disable
+yarn cli -- configure-oracle --mint <address> --price-feed <pyth-account> --disable
 ```
 
 ```typescript
