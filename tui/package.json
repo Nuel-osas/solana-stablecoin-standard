@@ -4,7 +4,9 @@
   "private": true,
   "description": "Terminal UI dashboard for the Solana Stablecoin Standard",
   "scripts": {
-    "start": "npx ts-node src/index.ts"
+    "start": "npx ts-node src/index.ts",
+    "build": "echo 'tui: no build step (ts-node at runtime)'",
+    "test": "echo 'tui: no tests (runtime-only dashboard)'"
   },
   "dependencies": {
     "blessed": "^0.1.81",

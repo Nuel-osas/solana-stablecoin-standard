@@ -227,11 +227,11 @@ Master authority can also perform any role's action directly without needing a r
 - **Role separation**: No single key controls everything — see RBAC table above
 - **Immutable compliance config**: SSS-1/SSS-2/SSS-3 extensions set at init, cannot be changed afterward
 - **PDA authority model**: All sensitive operations use program-derived authority, not EOA keys
-- **On-chain oracle enforcement**: Optional Pyth price validation rejects mint/burn during depeg events
+- **On-chain oracle enforcement**: Optional Pyth price validation rejects mint/burn when price is stale or depegged
 
 ## Oracle Price Enforcement (Pyth)
 
-Optional on-chain price validation during mint/burn operations. When configured, the program reads the Pyth price feed directly on-chain and rejects operations if the stablecoin has depegged beyond the configured threshold.
+Optional on-chain price validation during mint/burn operations. When configured, the program reads the Pyth price feed directly on-chain and rejects operations if the price is stale (exceeds `max_staleness_secs`) or depegged (exceeds `max_deviation_bps` from $1.00). The devnet integration test proves staleness rejection using SOL/USD (a non-stablecoin feed); depeg rejection uses the same code path with deviation comparison instead.
 
 ```bash
 # Configure oracle (authority-only)
