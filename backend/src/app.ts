@@ -697,6 +697,54 @@ app.post("/api/v1/compliance/seize", authMiddleware, async (req, res) => {
   }
 });
 
+// Update Metadata
+app.post("/api/v1/metadata", authMiddleware, async (req, res) => {
+  const reference = req.body.reference || `metadata_${Date.now()}`;
+  try {
+    const { uri } = req.body;
+    if (!uri) {
+      return res.status(400).json({ error: "uri is required" });
+    }
+    const mint = requireMint(res);
+    if (!mint) return;
+    if (!requireOperator(res)) return;
+
+    const [stablecoinPDA] = findStablecoinPDA(mint);
+
+    const txSig = await program!.methods
+      .updateMetadata(uri)
+      .accounts({
+        authority: operatorKeypair!.publicKey,
+        mint,
+        stablecoin: stablecoinPDA,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .signers([operatorKeypair!])
+      .rpc();
+
+    logAudit({
+      timestamp: new Date().toISOString(),
+      action: "update_metadata",
+      status: "success",
+      reference,
+      signature: txSig,
+      details: { uri },
+    });
+
+    res.json({ status: "executed", reference, signature: txSig });
+  } catch (error: any) {
+    logAudit({
+      timestamp: new Date().toISOString(),
+      action: "update_metadata",
+      status: "failed",
+      reference,
+      error: error.message,
+      details: { uri: req.body.uri },
+    });
+    res.status(500).json({ error: error.message, reference });
+  }
+});
+
 // ============ Webhook Management (auth required, persisted to disk) ============
 
 app.post("/api/v1/webhooks", authMiddleware, (req, res) => {

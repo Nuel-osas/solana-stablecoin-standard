@@ -662,6 +662,25 @@ export class SolanaStablecoin {
   }
 
   /**
+   * Update the stablecoin's metadata URI. Only master authority.
+   * Name and symbol are immutable after initialization.
+   */
+  async updateMetadata(authority: Keypair, uri: string): Promise<string> {
+    const txSig = await this.program.methods
+      .updateMetadata(uri)
+      .accounts({
+        authority: authority.publicKey,
+        mint: this.mint,
+        stablecoin: this.stablecoinPDA,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .signers([authority])
+      .rpc();
+
+    return txSig;
+  }
+
+  /**
    * Get total supply (minted - burned).
    */
   async getTotalSupply(): Promise<anchor.BN> {

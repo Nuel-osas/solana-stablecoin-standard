@@ -50,6 +50,8 @@ import * as path from "path";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const idl = require("./idl/sss_token.json");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const hookIdl = require("./idl/sss_transfer_hook.json");
 
 // Load program IDs from root .env, env vars, or fall back to defaults
 function loadRootEnv(): Record<string, string> {
@@ -105,6 +107,45 @@ function getProgram(
     commitment: "confirmed",
   });
   return new anchor.Program(idl as any, provider);
+}
+
+function getHookProgram(
+  connection: Connection,
+  authority: Keypair
+): anchor.Program {
+  const wallet = new anchor.Wallet(authority);
+  const provider = new anchor.AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+  });
+  return new anchor.Program(hookIdl as any, provider);
+}
+
+function getExtraAccountMetaListPDA(mint: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("extra-account-metas"), mint.toBuffer()],
+    TRANSFER_HOOK_PROGRAM_ID
+  );
+}
+
+async function initializeExtraAccountMetaList(
+  connection: Connection,
+  authority: Keypair,
+  mint: PublicKey
+): Promise<string> {
+  const hookProgram = getHookProgram(connection, authority);
+  const [extraAccountMetaListPDA] = getExtraAccountMetaListPDA(mint);
+
+  const tx = await hookProgram.methods
+    .initializeExtraAccountMetaList()
+    .accounts({
+      payer: authority.publicKey,
+      extraAccountMetaList: extraAccountMetaListPDA,
+      mint: mint,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+
+  return tx;
 }
 
 function getStablecoinPDA(mint: PublicKey): [PublicKey, number] {
@@ -327,8 +368,11 @@ initCmd
         .signers([mintKeypair])
         .rpc();
 
+      // Initialize transfer hook ExtraAccountMetaList
+      const hookTx = await initializeExtraAccountMetaList(connection, authority, mintKeypair.publicKey);
       console.log(`\n  ${c.green}${c.bold}Stablecoin initialized successfully!${c.reset}`);
       console.log(`  ${c.dim}Transaction:${c.reset} ${tx}`);
+      console.log(`  ${c.dim}Transfer Hook initialized:${c.reset} ${hookTx}`);
       console.log(`\n  ${c.yellow}Save this for subsequent commands:${c.reset}`);
       console.log(`    --mint ${c.bold}${mintKeypair.publicKey.toBase58()}${c.reset}`);
     } catch (err: any) {
@@ -384,8 +428,11 @@ initCmd
         .signers([mintKeypair])
         .rpc();
 
+      // Initialize transfer hook ExtraAccountMetaList
+      const hookTx = await initializeExtraAccountMetaList(connection, authority, mintKeypair.publicKey);
       console.log(`\n  Stablecoin initialized successfully!`);
       console.log(`  Transaction: ${tx}`);
+      console.log(`  ${c.dim}Transfer Hook initialized:${c.reset} ${hookTx}`);
       console.log(`  ${c.magenta}ConfidentialTransferMint:${c.reset} Enabled (Experimental)`);
       console.log(`  ${c.dim}Note: Full confidential transfers require ZK ElGamal program (not yet live on devnet/mainnet)${c.reset}`);
       console.log(`\n  Save these values for subsequent commands:`);
@@ -441,6 +488,12 @@ initCmd
         } as any)
         .signers([mintKeypair])
         .rpc();
+
+      // Initialize transfer hook ExtraAccountMetaList if hook is enabled
+      if (enableTransferHook) {
+        const hookTx = await initializeExtraAccountMetaList(connection, authority, mintKeypair.publicKey);
+        console.log(`  ${c.dim}Transfer Hook initialized:${c.reset} ${hookTx}`);
+      }
 
       console.log(`\n  ${c.green}${c.bold}Stablecoin initialized successfully!${c.reset}`);
       console.log(`  ${c.dim}Transaction:${c.reset} ${tx}`);
@@ -1824,6 +1877,49 @@ cli
         .rpc();
 
       console.log(`\n  ${c.green}Oracle configured successfully!${c.reset}`);
+      console.log(`  TX: ${txSig}`);
+    } catch (err: any) {
+      console.error(`\n  ${c.red}Error:${c.reset} ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command("update-metadata")
+  .description("Update stablecoin metadata URI")
+  .requiredOption("--mint <address>", "Stablecoin mint address")
+  .requiredOption("--uri <string>", "New metadata URI")
+  .option("--keypair <path>", "Path to authority keypair JSON")
+  .option("--cluster <url>", "Solana cluster URL", "https://api.devnet.solana.com")
+  .action(async (opts) => {
+    const keypairPath = opts.keypair || `${process.env.HOME}/.config/solana/id.json`;
+    const authority = loadKeypair(keypairPath);
+    const connection = getConnection(opts.cluster);
+    const program = getProgram(connection, authority);
+
+    const mint = requireMint(opts);
+    const uri: string = opts.uri;
+
+    const [stablecoinPDA] = getStablecoinPDA(mint);
+
+    console.log(`\n${c.bold}Update Metadata${c.reset}`);
+    console.log(`  Mint:       ${mint.toBase58()}`);
+    console.log(`  URI:        ${uri}`);
+    console.log(`  Authority:  ${authority.publicKey.toBase58()}`);
+
+    try {
+      const txSig = await program.methods
+        .updateMetadata(uri)
+        .accounts({
+          authority: authority.publicKey,
+          mint,
+          stablecoin: stablecoinPDA,
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
+        })
+        .signers([authority])
+        .rpc();
+
+      console.log(`\n  ${c.green}Metadata updated successfully!${c.reset}`);
       console.log(`  TX: ${txSig}`);
     } catch (err: any) {
       console.error(`\n  ${c.red}Error:${c.reset} ${err.message}`);
