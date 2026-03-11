@@ -1,0 +1,139 @@
+[1m╔══════════════════════════════════════════════════════════════╗[0m
+[1m║  SSS-3 Full E2E CT — Hook + Allowlist + ZK Proofs          ║[0m
+[1m╚══════════════════════════════════════════════════════════════╝[0m
+  [1;33m→ All required tools found[0m
+
+[0;36m[1/11][0m [1mBuilding SSS-3 programs (anchor build)[0m
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running unittests src/lib.rs (/Users/emmanuelosadebe/Downloads/curious/solana-stablecoin-standard/target/debug/deps/sss_token-6af4b5aadab5b56b)
+  [0;32m✓ SSS programs built[0m
+
+[0;36m[2/11][0m [1mBuilding Token-2022 v10.0.0 with zk-ops[0m
+  [1;33m→ Using cached build[0m
+  [0;32m✓ Token-2022 v10.0.0 already built[0m
+
+[0;36m[3/11][0m [1mStarting validator with Token-2022 v10 + SSS programs[0m
+Waiting for fees to stabilize 1...
+Waiting for fees to stabilize 2...
+  [0;32m✓ Validator running with v10 Token-2022 + SSS programs (PID 40592)[0m
+
+[0;36m[4/11][0m [1mCreating SSS-3 stablecoin via sss_token program (v6 CPI → v10 runtime)[0m
+yarn run v1.22.22
+$ ts-node cli/src/index.ts init sss-3 --name CT-Test-USD --symbol CTUSD --decimals 6 --cluster localnet
+
+[36m[1mInitializing SSS-3 stablecoin[0m: CT-Test-USD (CTUSD)
+  [2mCluster:[0m   localnet
+  [2mAuthority:[0m DBk7Bu7tdfJ3CwmMWf9L3u1ScsbzN2FCnGrsGeuZvQAk
+  [2mMint:[0m      19r9pLie6cfLKPQuTLVCVWwF9ZzzY54faVBcPXn7y4t
+  Stablecoin PDA: CdRmQP2PZuGPPUE5GmLg4hHQucfh8VFLPTWCpMwJr4rq
+
+  Stablecoin initialized successfully!
+  Transaction: 5ELHNxiLwvzQTEqTtvpFsej1WGDDoWxDpjkqiVY7nDSh4EjxrMojz59ZZANkUsJHorgkGdAHWYW2D9bn5VpBrLCo
+  [2mTransfer Hook initialized:[0m 3sUhQ6CB1ct1mALtXxjbyWMVi5C1mGRSY9htEDyXT5MCGUqdotvpPSqkvnCjWLzPHTfP9rCH1FduRWgztMuqo8g2
+  [35mConfidentialTransferMint:[0m Enabled (Experimental)
+  [2mNote: Full confidential transfers require ZK ElGamal program (not yet live on devnet/mainnet)[0m
+
+  Save these values for subsequent commands:
+    --mint 19r9pLie6cfLKPQuTLVCVWwF9ZzzY54faVBcPXn7y4t
+Done in 2.67s.
+  [1;33m→ SSS-3 Mint: 19r9pLie6cfLKPQuTLVCVWwF9ZzzY54faVBcPXn7y4t[0m
+  [0;32m✓ SSS-3 stablecoin created on v10 Token-2022 validator![0m
+
+[0;36m[5/11][0m [1mVerifying ConfidentialTransferMint extension on SSS-3 mint[0m
+
+SPL Token Mint
+  Address: 19r9pLie6cfLKPQuTLVCVWwF9ZzzY54faVBcPXn7y4t
+  Program: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
+  Supply: 0
+  Decimals: 6
+  Mint authority: CdRmQP2PZuGPPUE5GmLg4hHQucfh8VFLPTWCpMwJr4rq
+  Freeze authority: CdRmQP2PZuGPPUE5GmLg4hHQucfh8VFLPTWCpMwJr4rq
+Extensions
+  Metadata Pointer:
+    Authority: CdRmQP2PZuGPPUE5GmLg4hHQucfh8VFLPTWCpMwJr4rq
+    Metadata address: 19r9pLie6cfLKPQuTLVCVWwF9ZzzY54faVBcPXn7y4t
+  Permanent delegate: CdRmQP2PZuGPPUE5GmLg4hHQucfh8VFLPTWCpMwJr4rq
+  Transfer Hook:
+    Authority: CdRmQP2PZuGPPUE5GmLg4hHQucfh8VFLPTWCpMwJr4rq
+    Program Id: B9HzG9fuxbuJBG2wTSP6UmxBSQLdaUAk62Kcdf41WxAt
+  Confidential transfer:
+    Authority: DBk7Bu7tdfJ3CwmMWf9L3u1ScsbzN2FCnGrsGeuZvQAk
+    Account approve policy: auto
+    Audit key: audits are disabled
+  [0;32m✓ ConfidentialTransferMint extension present on SSS-3 mint[0m
+
+[0;36m[6/11][0m [1mMinting tokens on SSS-3 stablecoin[0m
+  [1;33m→ Minter assign: yarn run v1.22.22
+$ ts-node cli/src/index.ts roles assign --role minter --address DBk7Bu7tdfJ3CwmMWf9L3u1ScsbzN2FCnGrsGeuZvQAk --mint 19r9pLie6cfLKPQuTLVCVWwF9ZzzY54faVBcPXn7y4t --cluster localnet
+
+Assigning [1mminter[0m role to DBk7Bu7tdfJ3CwmMWf9L3u1ScsbzN2FCnGrsGeuZvQAk
+  Mint: 19r9pLie6cfLKPQuTLVCVWwF9ZzzY54faVBcPXn7y4t
+
+  [32m[1mRole assigned successfully![0m
+  Transaction: 4NQkuL5zX5kWFb81uYvqK5eW7A9Yk33C784AcRc7izgKkWjtySXm28ncnLbRgA2jQyhXkaryMfQEC9pWMFfLtV8R
+Done in 1.30s.[0m
+  [1;33m→ Mint result: yarn run v1.22.22
+$ ts-node cli/src/index.ts mint --mint 19r9pLie6cfLKPQuTLVCVWwF9ZzzY54faVBcPXn7y4t --to DBk7Bu7tdfJ3CwmMWf9L3u1ScsbzN2FCnGrsGeuZvQAk --amount 1000 --cluster localnet
+
+Minting 1000 tokens to DBk7Bu7tdfJ3CwmMWf9L3u1ScsbzN2FCnGrsGeuZvQAk
+  Mint: 19r9pLie6cfLKPQuTLVCVWwF9ZzzY54faVBcPXn7y4t
+  Recipient ATA: A8q8DMaKJNgGt55DwV6NCKJmhqq4cd7bjC1sgrQwp8kt
+  Amount (base units): 1000000000
+
+  Tokens minted successfully!
+  Transaction: 3fHTqDcYyzxeChvTtJhVGfuDZUD6khNsw5zEwhc28dXhcyAf8Q3RRVjfLdNbWV5mbemuA53pfjyc3sVQ8QFvpFBc
+Done in 1.71s.[0m
+  [1;33m→ Balance after mint: 1000[0m
+  [0;32m✓ Tokens minted on SSS-3 stablecoin[0m
+
+[0;36m[7/11][0m [1mAdding sender to allowlist (SSS-3 requirement)[0m
+  [0;32m✓ Sender added to allowlist[0m
+
+[0;36m[8/11][0m [1mConfiguring confidential transfer on SSS-3 token accounts[0m
+  [1;33m→ Sender ATA: A8q8DMaKJNgGt55DwV6NCKJmhqq4cd7bjC1sgrQwp8kt[0m
+
+Signature: XQNtp8QHddxqmBpL22rwdaxKbCK5PN8hGfeanDg3jjH3cEX6FaENk8HUsB7CcTP91UvHRx55UXbmoNr7ht2R2rL
+
+  [0;32m✓ CT configured on sender account (ElGamal keys generated)[0m
+  [1;33m→ Recipient wallet: 2judLqotFH72kvhm8FBwyho7gnKNx7wQBbQhJHL71ZAJ[0m
+Creating account 6sSfAfcTtuDUMEQgKj6znaY5XM3KNiPtCeYf4whMgmHV
+
+Signature: fvqHyqhUt6Xa6XUVGUMwE75mULai2EwsVenz5Hs8xwKkii75h6saVLkJiqhwb2rVdwfHtqkCTBnCnP8n7QRWNjZ
+  [1;33m→ Recipient ATA: 6sSfAfcTtuDUMEQgKj6znaY5XM3KNiPtCeYf4whMgmHV[0m
+
+Signature: 2tRohGjsShA8XsPVm6EoGLexVPw46vB6soWoJf6Gtt3GJFkvbmZXEoFjz6VX5uCearpyWkFR746LLDhoEGqYYeu8
+
+  [0;32m✓ CT configured on recipient account[0m
+
+[0;36m[9/11][0m [1mAdding recipient to allowlist (SSS-3 requirement)[0m
+  [0;32m✓ Recipient added to allowlist[0m
+
+[0;36m[10/11][0m [1mDeposit → Confidential Transfer → Withdraw on SSS-3 mint[0m
+  [0;32m✓ 100 tokens deposited into encrypted balance (SSS-3 mint)[0m
+  [1;33m→ Transferring 50 tokens confidentially to 6sSfAfcTtuDUMEQgKj6znaY5XM3KNiPtCeYf4whMgmHV[0m
+Confidential Transfer 50 tokens
+  Sender: A8q8DMaKJNgGt55DwV6NCKJmhqq4cd7bjC1sgrQwp8kt
+  Recipient: 6sSfAfcTtuDUMEQgKj6znaY5XM3KNiPtCeYf4whMgmHV
+
+Signature: 5DejC6Q8jZmNt3robNtHBYSjguMN1R4w6hUZwXQUvx7fbpXyJeRRSxojzdCzEb5AhzdLrEVfpc4fPMdSd3mQYChf
+  [0;32m✓ Confidential transfer 50 tokens — ZK proofs verified on SSS-3 mint![0m
+  [0;32m✓ 25 tokens withdrawn from confidential balance[0m
+
+[0;36m[11/11][0m [1mVerifying final balances[0m
+  [1;33m→ Sender public balance:    900[0m
+  [1;33m→ Recipient public balance: 25 (expected: 25)[0m
+  [0;32m✓ Final balances correct — END-TO-END CT ON SSS-3 MINT VERIFIED[0m
+
+[1m══════════════════════════════════════════════════════════════[0m
+[0;32m[1m  All 14/14 checks passed[0m
+
+  SSS-3 program mint → assign minter → mint tokens
+  → configure CT → deposit → confidential transfer (ZK)
+  → withdraw → verify balances
+
+[0;32m[1m  END-TO-END CONFIDENTIAL TRANSFER ON SSS-3 MINT ✓[0m
+[1m══════════════════════════════════════════════════════════════[0m
+
+
+  [1;33m→ Stopping test validator (PID 40592)...[0m
+  [1;33m→ Restored Solana config to https://api.devnet.solana.com[0m

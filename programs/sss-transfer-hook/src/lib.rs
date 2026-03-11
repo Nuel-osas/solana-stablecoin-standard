@@ -296,6 +296,128 @@ pub mod sss_transfer_hook {
         msg!("Extra account meta list initialized with blacklist + allowlist PDAs");
         Ok(())
     }
+
+    /// Fallback handler for the spl-transfer-hook-interface Execute instruction.
+    /// Token-2022 invokes the hook using the interface discriminator and passes:
+    ///   0: source, 1: mint, 2: dest, 3: authority,
+    ///   4: extra_account_meta_list, 5+: extra accounts from the list
+    /// We parse accounts manually since the layout differs from the Anchor struct.
+    pub fn fallback<'info>(
+        _program_id: &Pubkey,
+        accounts: &'info [AccountInfo<'info>],
+        data: &[u8],
+    ) -> Result<()> {
+        if data.len() < 16 {
+            return Err(ProgramError::InvalidInstructionData.into());
+        }
+        let amount = u64::from_le_bytes(
+            data[8..16].try_into().map_err(|_| ProgramError::InvalidInstructionData)?
+        );
+
+        // Token-2022 hook account layout:
+        //  0: source token account
+        //  1: mint
+        //  2: destination token account
+        //  3: authority (source owner)
+        //  4: extra_account_meta_list PDA (auto-injected by Token-2022)
+        //  5: extra[0] = sss-token program ID
+        //  6: extra[1] = stablecoin PDA
+        //  7: extra[2] = source blacklist PDA
+        //  8: extra[3] = destination blacklist PDA
+        //  9: extra[4] = source allowlist PDA
+        // 10: extra[5] = destination allowlist PDA
+        if accounts.len() < 7 {
+            return Err(ProgramError::NotEnoughAccountKeys.into());
+        }
+
+        let source_account = &accounts[0];
+        let dest_account = &accounts[2];
+        let stablecoin = &accounts[6];
+
+        // Read source and dest owners from token account data
+        let source_data = source_account.try_borrow_data()?;
+        let source_acct = StateWithExtensions::<TokenAccount>::unpack(&source_data)
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let source_owner = source_acct.base.owner;
+        drop(source_data);
+
+        let dest_data = dest_account.try_borrow_data()?;
+        let dest_acct = StateWithExtensions::<TokenAccount>::unpack(&dest_data)
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let dest_owner = dest_acct.base.owner;
+        drop(dest_data);
+
+        let stablecoin_key = stablecoin.key();
+
+        // ── Blacklist checks (SSS-2) ──
+        let (source_bl_pda, _) = Pubkey::find_program_address(
+            &[BLACKLIST_SEED, stablecoin_key.as_ref(), source_owner.as_ref()],
+            &SSS_TOKEN_PROGRAM_ID,
+        );
+        if accounts.len() > 7 {
+            let source_bl = &accounts[7];
+            if source_bl.key() == source_bl_pda
+                && source_bl.data_len() > 0
+                && source_bl.owner == &SSS_TOKEN_PROGRAM_ID
+                && read_blacklist_active(&source_bl.try_borrow_data()?)
+            {
+                return Err(error!(TransferHookError::SenderBlacklisted));
+            }
+        }
+
+        let (dest_bl_pda, _) = Pubkey::find_program_address(
+            &[BLACKLIST_SEED, stablecoin_key.as_ref(), dest_owner.as_ref()],
+            &SSS_TOKEN_PROGRAM_ID,
+        );
+        if accounts.len() > 8 {
+            let dest_bl = &accounts[8];
+            if dest_bl.key() == dest_bl_pda
+                && dest_bl.data_len() > 0
+                && dest_bl.owner == &SSS_TOKEN_PROGRAM_ID
+                && read_blacklist_active(&dest_bl.try_borrow_data()?)
+            {
+                return Err(error!(TransferHookError::RecipientBlacklisted));
+            }
+        }
+
+        // ── Allowlist checks (SSS-3) ──
+        let stablecoin_data = stablecoin.try_borrow_data()?;
+        let allowlist_enabled = read_enable_allowlist(&stablecoin_data);
+        drop(stablecoin_data);
+
+        if allowlist_enabled {
+            let (source_al_pda, _) = Pubkey::find_program_address(
+                &[ALLOWLIST_SEED, stablecoin_key.as_ref(), source_owner.as_ref()],
+                &SSS_TOKEN_PROGRAM_ID,
+            );
+            let source_allowed = if accounts.len() > 9 {
+                let al = &accounts[9];
+                al.key() == source_al_pda && al.data_len() > 0 && al.owner == &SSS_TOKEN_PROGRAM_ID
+            } else {
+                false
+            };
+            if !source_allowed {
+                return Err(error!(TransferHookError::SenderNotAllowlisted));
+            }
+
+            let (dest_al_pda, _) = Pubkey::find_program_address(
+                &[ALLOWLIST_SEED, stablecoin_key.as_ref(), dest_owner.as_ref()],
+                &SSS_TOKEN_PROGRAM_ID,
+            );
+            let dest_allowed = if accounts.len() > 10 {
+                let al = &accounts[10];
+                al.key() == dest_al_pda && al.data_len() > 0 && al.owner == &SSS_TOKEN_PROGRAM_ID
+            } else {
+                false
+            };
+            if !dest_allowed {
+                return Err(error!(TransferHookError::RecipientNotAllowlisted));
+            }
+        }
+
+        msg!("Transfer hook (fallback): transfer of {} tokens approved", amount);
+        Ok(())
+    }
 }
 
 #[error_code]
