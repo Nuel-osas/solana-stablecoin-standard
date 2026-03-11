@@ -84,6 +84,8 @@ describe("SSS-1: Minimal Stablecoin", () => {
       enablePermanentDelegate: false,
       enableTransferHook: false,
       defaultAccountFrozen: false,
+      enableAllowlist: false,
+      supplyCap: null,
     };
 
     const tx = await program.methods

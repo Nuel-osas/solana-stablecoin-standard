@@ -105,6 +105,8 @@ describe("SSS-2: Compliant Stablecoin", () => {
       enablePermanentDelegate: true,
       enableTransferHook: true,
       defaultAccountFrozen: false,
+      enableAllowlist: false,
+      supplyCap: null,
     };
 
     const tx = await program.methods
@@ -214,9 +216,9 @@ describe("SSS-2: Compliant Stablecoin", () => {
 
     console.log("  Blacklist remove tx:", tx);
 
-    // Verify account was closed
-    const info = await provider.connection.getAccountInfo(blacklistPDA);
-    expect(info).to.be.null;
+    // Verify entry deactivated (audit trail preserved)
+    const entry = await program.account.blacklistEntry.fetch(blacklistPDA);
+    expect(entry.active).to.be.false;
   });
 
   it("seizes tokens from blacklisted account", async () => {
@@ -325,6 +327,8 @@ describe("SSS-2: Compliant Stablecoin", () => {
         enablePermanentDelegate: false,
         enableTransferHook: false,
         defaultAccountFrozen: false,
+        enableAllowlist: false,
+        supplyCap: null,
       })
       .accounts({
         authority: authority.publicKey,
