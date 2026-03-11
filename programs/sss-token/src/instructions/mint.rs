@@ -69,6 +69,7 @@ pub fn handler(ctx: Context<MintTokens>, amount: u64) -> Result<()> {
         recipient: ctx.accounts.recipient_token_account.key(),
         amount,
         minter: ctx.accounts.minter.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())

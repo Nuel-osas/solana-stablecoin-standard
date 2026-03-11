@@ -29,6 +29,7 @@ pub fn assign_role_handler(ctx: Context<AssignRole>, role: Role, assignee: Pubke
         role: role.to_string(),
         assignee,
         by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     // If assigning minter role, also initialize minter info
@@ -60,6 +61,7 @@ pub fn revoke_role_handler(ctx: Context<RevokeRole>, _role: Role, _assignee: Pub
         role: role_assignment.role.to_string(),
         assignee: role_assignment.assignee,
         by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())
@@ -79,6 +81,7 @@ pub fn nominate_authority_handler(ctx: Context<NominateAuthority>, new_authority
         mint: stablecoin.mint,
         current_authority: ctx.accounts.authority.key(),
         pending_authority: new_authority,
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())
@@ -104,6 +107,7 @@ pub fn accept_authority_handler(ctx: Context<AcceptAuthority>) -> Result<()> {
         mint: stablecoin.mint,
         old_authority,
         new_authority: stablecoin.authority,
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())
@@ -125,6 +129,7 @@ pub fn transfer_authority_handler(ctx: Context<TransferAuthority>, new_authority
         mint: stablecoin.mint,
         old_authority,
         new_authority,
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())
@@ -146,6 +151,7 @@ pub fn set_supply_cap_handler(ctx: Context<SetSupplyCap>, supply_cap: u64) -> Re
         old_cap,
         new_cap: supply_cap,
         by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())

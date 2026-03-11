@@ -41,6 +41,7 @@ pub fn handler(ctx: Context<BurnTokens>, amount: u64) -> Result<()> {
         mint: ctx.accounts.mint.key(),
         amount,
         burner: ctx.accounts.burner.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())

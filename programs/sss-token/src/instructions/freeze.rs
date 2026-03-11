@@ -41,6 +41,7 @@ pub fn freeze_handler(ctx: Context<FreezeAccount>) -> Result<()> {
         mint: ctx.accounts.mint.key(),
         account: ctx.accounts.target_account.key(),
         by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())
@@ -79,6 +80,7 @@ pub fn thaw_handler(ctx: Context<ThawAccount>) -> Result<()> {
         mint: ctx.accounts.mint.key(),
         account: ctx.accounts.target_account.key(),
         by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())

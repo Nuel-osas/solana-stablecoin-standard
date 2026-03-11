@@ -21,6 +21,7 @@ pub fn pause_handler(ctx: Context<PauseUnpause>) -> Result<()> {
     emit!(events::Paused {
         mint: stablecoin.mint,
         by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())
@@ -41,6 +42,7 @@ pub fn unpause_handler(ctx: Context<PauseUnpause>) -> Result<()> {
     emit!(events::Unpaused {
         mint: stablecoin.mint,
         by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())
