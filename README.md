@@ -238,27 +238,29 @@ Master authority can also perform any role's action directly without needing a r
 | Default Account State | | Optional | Optional | Freeze new accounts by default |
 | ConfidentialTransferMint | | | Yes | ZK-encrypted balances (experimental PoC) |
 
-## SSS-3 Confidential Transfer (Experimental)
+## SSS-3 Confidential Transfer (Verified on Localnet)
 
-SSS-3 initializes the `ConfidentialTransferMint` extension on the mint, enabling the token for future ZK-encrypted confidential transfers. This is a proof-of-concept — the full confidential transfer flow is blocked by tooling immaturity.
+SSS-3 initializes the `ConfidentialTransferMint` extension on the mint, enabling ZK-encrypted confidential transfers. We verified the **complete CT flow** on localnet by building Token-2022 v10.0.0 from source with `zk-ops` enabled.
 
-### What works today
+### Full CT Flow — All Steps Working
 
 | Step | Status | Notes |
 |------|--------|-------|
 | ConfidentialTransferMint init on mint | Working | Extension verified in test suite |
 | Token account creation | Working | Standard Token-2022 accounts |
-| Account CT configuration (ElGamal keys) | Working | `configure-confidential-transfer-account` succeeds on localnet |
-| Deposit into confidential balance | Blocked | `spl-token` CLI v5.5.0 sends instruction data incompatible with on-chain Token-2022 program |
-| Confidential transfer | Blocked | Depends on deposit working first |
-| ZK ElGamal Proof program | Available on localnet | Native program present in Solana 3.1.10 test validator |
-| ZK ElGamal Proof program (devnet/mainnet) | Disabled | Undergoing security audit |
+| Account CT configuration (ElGamal keys) | Working | ElGamal encryption keys generated and stored |
+| Deposit into confidential balance | Working | Tokens converted to encrypted balance |
+| Apply pending balance | Working | Pending balance applied to available |
+| **Confidential transfer** | **Working** | ZK proofs generated and verified on-chain |
+| **Withdraw from confidential balance** | **Working** | Decrypted back to public balance |
 
-### Why it's blocked
+### How we tested it
 
-The Token-2022 program (both localnet and mainnet) is compiled **without the `zk-ops` Rust feature flag**. In `spl-token-2022` v6.0.0, all CT operations (deposit, withdraw, transfer) are gated by `#[cfg(feature = "zk-ops")]` — when disabled, the program unconditionally returns `InvalidInstructionData`. No client-side workaround exists (we verified with the CLI, `@solana-program/token-2022` instruction builders, and manual TypeScript construction). The fix requires Solana to ship a Token-2022 build with `zk-ops` enabled.
+The default test validator ships Token-2022 v6.0.0, but the CLI v5.5.0 expects v10.0.0. We built Token-2022 v10.0.0 from [source](https://github.com/solana-program/token-2022) with `zk-ops` (default feature) and loaded it via `solana-test-validator --bpf-program`. Full reproduction steps in [`docs/SSS-3.md`](docs/SSS-3.md).
 
-For full details, see [`docs/SSS-3.md`](docs/SSS-3.md).
+### Devnet/Mainnet limitations
+
+The ZK ElGamal Proof program is disabled on devnet/mainnet (security audit pending). Once enabled and Token-2022 is updated to v10.0.0+, the same flow will work in production.
 
 ## Testing
 

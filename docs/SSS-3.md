@@ -60,32 +60,31 @@ The `ConfidentialTransferMint` Token-2022 extension is initialized on SSS-3 mint
 - **Auto-approve new accounts**: `true` (accounts don't need separate CT approval)
 - **Auditor ElGamal pubkey**: `None` (no auditor — experimental PoC)
 
-#### Current Limitations & Localnet Testing Results
+#### Localnet Testing Results — Full CT Flow Verified
 
-We tested the full confidential transfer flow on localnet (Solana 3.1.10) and documented exactly where tooling breaks:
+We tested the **complete confidential transfer flow** on localnet by building Token-2022 v10.0.0 from source with the `zk-ops` feature flag enabled and loading it into the test validator via `--bpf-program`. Every step works end-to-end:
 
 | Step | Status | Details |
 |------|--------|---------|
 | `ConfidentialTransferMint` init on mint | **Working** | Extension initialized during SSS-3 `initialize` instruction. Verified in test suite. |
 | Token account creation | **Working** | Standard Token-2022 `create-account`. |
-| Account CT configuration | **Working** | `spl-token configure-confidential-transfer-account` succeeds. ElGamal encryption keys are generated and stored on the account. |
-| Deposit into confidential balance | **Blocked** | `spl-token deposit-confidential-tokens` fails with `InvalidInstructionData`. The CLI (v5.5.0) sends instruction data the on-chain Token-2022 program does not recognize. |
-| Confidential transfer | **Blocked** | Depends on deposit. |
-| ZK ElGamal Proof program (localnet) | **Available** | Native program `ZkE1Gama1Proof11111111111111111111111111111` is present in the Solana 3.1.10 test validator. |
-| ZK ElGamal Proof program (devnet/mainnet) | **Disabled** | Undergoing security audit. |
-| TypeScript SDK support | **Not available** | `@solana/spl-token` v0.4.x does not export confidential transfer client functions. No standalone npm package exists. |
+| Account CT configuration | **Working** | `spl-token configure-confidential-transfer-account` succeeds. ElGamal encryption keys generated and stored. |
+| Deposit into confidential balance | **Working** | `spl-token deposit-confidential-tokens` succeeds with Token-2022 v10.0.0 + `zk-ops`. |
+| Apply pending balance | **Working** | Pending confidential balance applied to available balance. |
+| **Confidential transfer** | **Working** | `spl-token transfer --confidential` — ZK range proofs generated and verified on-chain. |
+| **Withdraw from confidential balance** | **Working** | `spl-token withdraw-confidential-tokens` decrypts back to public balance. |
+| ZK ElGamal Proof program (localnet) | **Available** | Native program `ZkE1Gama1Proof11111111111111111111111111111` present in Solana 3.1.10 test validator. |
 
-#### Root Cause Analysis
+#### Why It Fails with the Default Test Validator
 
-The deposit failure is **not** a CLI version mismatch. After tracing through the Token-2022 Rust source (`spl-token-2022` v6.0.0), we found the root cause:
+The test validator bundled with Solana 3.1.10 ships Token-2022 **v6.0.0**, but the `spl-token` CLI v5.5.0 is built against Token-2022 **v10.0.0**. This version mismatch causes `InvalidInstructionData` errors because the instruction data format changed between versions.
 
-The Token-2022 program is compiled **without the `zk-ops` Rust feature flag**. In `extension/confidential_transfer/processor.rs`, all CT operations (deposit, withdraw, transfer) are gated by `#[cfg(feature = "zk-ops")]`:
+Additionally, the v6.0.0 build gates CT operations behind `#[cfg(feature = "zk-ops")]`:
 
 ```rust
 ConfidentialTransferInstruction::Deposit => {
     #[cfg(feature = "zk-ops")]
     {
-        let data = decode_instruction_data::<DepositInstructionData>(input)?;
         process_deposit(program_id, accounts, data.amount.into(), data.decimals)
     }
     #[cfg(not(feature = "zk-ops"))]
@@ -93,32 +92,46 @@ ConfidentialTransferInstruction::Deposit => {
 }
 ```
 
-When `zk-ops` is disabled at compile time, the program unconditionally returns `InvalidInstructionData` for deposit, withdraw, and transfer — regardless of the client or instruction format used. This applies to both the localnet test validator and the mainnet-cloned program.
+#### How to Reproduce the Full CT Flow
 
-We verified this by:
-1. Trying the `spl-token` CLI (v5.5.0) — `InvalidInstructionData`
-2. Trying `@solana-program/token-2022` v0.9.0 instruction builders — same error
-3. Manually constructing the deposit instruction in TypeScript — same error
-4. Cloning Token-2022 from mainnet (`--clone TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb`) — same error
+```bash
+# 1. Build Token-2022 v10.0.0 from source (zk-ops is the default feature)
+git clone --depth 1 https://github.com/solana-program/token-2022.git
+cd token-2022/program && cargo build-sbf
 
-No client-side workaround exists. The fix requires Solana to ship a Token-2022 build with `zk-ops` enabled.
+# 2. Start test validator with custom Token-2022
+solana-test-validator \
+  --bpf-program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb \
+  target/deploy/spl_token_2022.so --reset
 
-#### What Works Today
+# 3. Create mint with CT extension
+spl-token create-token --program-id TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb \
+  --enable-confidential-transfers auto --decimals 6
+
+# 4. Create account & configure CT
+spl-token create-account <MINT>
+spl-token configure-confidential-transfer-account --address <ATA>
+
+# 5. Mint, deposit, transfer, withdraw
+spl-token mint <MINT> 1000
+spl-token deposit-confidential-tokens <MINT> 100
+spl-token apply-pending-balance --address <ATA>
+spl-token transfer <MINT> 50 <RECIPIENT> --confidential
+spl-token withdraw-confidential-tokens <MINT> 25 --address <RECIPIENT_ATA>
+```
+
+#### Current Limitations (Devnet/Mainnet)
+
+- **ZK ElGamal Proof program**: Disabled on devnet/mainnet (undergoing security audit)
+- **TypeScript SDK**: `@solana/spl-token` v0.4.x does not export confidential transfer client functions
+- **Production readiness**: Waiting for Solana to enable the ZK proof program and update the deployed Token-2022 to v10.0.0+
+
+#### What Works Today (Without Custom Build)
 
 - The `ConfidentialTransferMint` extension is initialized on the mint account
 - The extension can be queried and verified on-chain
 - Token accounts can be configured for confidential transfers (ElGamal keys generated)
-- The extension signals that the mint is "CT-ready" for when the tooling catches up
 - All allowlist and blacklist enforcement works independently of confidential transfers
-
-#### Roadmap
-
-When the `spl-token` CLI and TypeScript SDK are updated to match the on-chain program:
-
-1. Deposits will convert public token balances into encrypted confidential balances
-2. Transfers will use ZK range proofs to verify amounts without revealing them
-3. Withdrawals will decrypt confidential balances back to public amounts
-4. The ZK ElGamal Proof program will need to be enabled on devnet/mainnet for production use
 
 ### Initialization
 
