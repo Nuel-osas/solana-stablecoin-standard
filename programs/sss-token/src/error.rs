@@ -40,4 +40,8 @@ pub enum SSSError {
     NoPendingAuthority,
     #[msg("Caller is not the nominated pending authority")]
     NotPendingAuthority,
+    #[msg("Allowlist is not enabled for this stablecoin")]
+    AllowlistNotEnabled,
+    #[msg("Address is not on the allowlist")]
+    NotAllowlisted,
 }

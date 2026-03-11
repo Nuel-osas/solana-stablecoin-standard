@@ -16,14 +16,12 @@ pub fn add_to_blacklist_handler(
     require!(stablecoin.is_compliance_enabled(), SSSError::ComplianceNotEnabled);
     require!(reason.len() <= MAX_REASON_LEN, SSSError::ReasonTooLong);
 
-    // Verify blacklister role
-    let role_assignment = &ctx.accounts.role_assignment;
-    require!(role_assignment.active, SSSError::Unauthorized);
-    require!(role_assignment.role == Role::Blacklister, SSSError::Unauthorized);
-    require!(
-        role_assignment.assignee == ctx.accounts.blacklister.key(),
-        SSSError::Unauthorized
-    );
+    // Verify blacklister role or master authority
+    let is_master = ctx.accounts.blacklister.key() == stablecoin.authority;
+    let is_blacklister = ctx.accounts.role_assignment.as_ref()
+        .map(|r| r.active && r.role == Role::Blacklister && r.assignee == ctx.accounts.blacklister.key())
+        .unwrap_or(false);
+    require!(is_master || is_blacklister, SSSError::Unauthorized);
 
     let blacklist_entry = &mut ctx.accounts.blacklist_entry;
     blacklist_entry.stablecoin = stablecoin.key();
@@ -31,6 +29,7 @@ pub fn add_to_blacklist_handler(
     blacklist_entry.reason = reason.clone();
     blacklist_entry.blacklisted_at = Clock::get()?.unix_timestamp;
     blacklist_entry.blacklisted_by = ctx.accounts.blacklister.key();
+    blacklist_entry.active = true;
     blacklist_entry.bump = ctx.bumps.blacklist_entry;
 
     emit!(events::BlacklistAdded {
@@ -38,6 +37,7 @@ pub fn add_to_blacklist_handler(
         address,
         reason,
         by: ctx.accounts.blacklister.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())
@@ -50,23 +50,23 @@ pub fn remove_from_blacklist_handler(
     let stablecoin = &ctx.accounts.stablecoin;
     require!(stablecoin.is_compliance_enabled(), SSSError::ComplianceNotEnabled);
 
-    // Verify blacklister role
-    let role_assignment = &ctx.accounts.role_assignment;
-    require!(role_assignment.active, SSSError::Unauthorized);
-    require!(role_assignment.role == Role::Blacklister, SSSError::Unauthorized);
-    require!(
-        role_assignment.assignee == ctx.accounts.blacklister.key(),
-        SSSError::Unauthorized
-    );
+    // Verify blacklister role or master authority
+    let is_master = ctx.accounts.blacklister.key() == stablecoin.authority;
+    let is_blacklister = ctx.accounts.role_assignment.as_ref()
+        .map(|r| r.active && r.role == Role::Blacklister && r.assignee == ctx.accounts.blacklister.key())
+        .unwrap_or(false);
+    require!(is_master || is_blacklister, SSSError::Unauthorized);
+
+    let blacklist_entry = &mut ctx.accounts.blacklist_entry;
+    require!(blacklist_entry.active, SSSError::NotBlacklisted);
+    blacklist_entry.active = false;
 
     emit!(events::BlacklistRemoved {
         mint: stablecoin.mint,
-        address: ctx.accounts.blacklist_entry.address,
+        address: blacklist_entry.address,
         by: ctx.accounts.blacklister.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
-
-    // Close the blacklist entry account, refund rent to blacklister
-    // The account will be closed by Anchor's `close` constraint
 
     Ok(())
 }
@@ -76,17 +76,15 @@ pub fn seize_handler(ctx: Context<Seize>) -> Result<()> {
     require!(!stablecoin.paused, SSSError::Paused);
     require!(stablecoin.enable_permanent_delegate, SSSError::ComplianceNotEnabled);
 
-    // Verify seizer role
-    let role_assignment = &ctx.accounts.role_assignment;
-    require!(role_assignment.active, SSSError::Unauthorized);
-    require!(role_assignment.role == Role::Seizer, SSSError::Unauthorized);
-    require!(
-        role_assignment.assignee == ctx.accounts.seizer.key(),
-        SSSError::Unauthorized
-    );
+    // Verify seizer role or master authority
+    let is_master = ctx.accounts.seizer.key() == stablecoin.authority;
+    let is_seizer = ctx.accounts.role_assignment.as_ref()
+        .map(|r| r.active && r.role == Role::Seizer && r.assignee == ctx.accounts.seizer.key())
+        .unwrap_or(false);
+    require!(is_master || is_seizer, SSSError::Unauthorized);
 
-    // Verify target is blacklisted
-    // The blacklist_entry account existing and being valid confirms this
+    // Verify target is actively blacklisted
+    require!(ctx.accounts.blacklist_entry.active, SSSError::SeizeRequiresBlacklist);
 
     let amount = ctx.accounts.source_account.amount;
     require!(amount > 0, SSSError::MathOverflow);
@@ -99,7 +97,6 @@ pub fn seize_handler(ctx: Context<Seize>) -> Result<()> {
         &[stablecoin.bump],
     ];
 
-    // Use transfer_checked via permanent delegate authority
     token_2022::transfer_checked(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -121,6 +118,7 @@ pub fn seize_handler(ctx: Context<Seize>) -> Result<()> {
         to: ctx.accounts.treasury_account.key(),
         amount,
         by: ctx.accounts.seizer.key(),
+        timestamp: Clock::get()?.unix_timestamp,
     });
 
     Ok(())
@@ -138,14 +136,15 @@ pub struct BlacklistAdd<'info> {
     )]
     pub stablecoin: Account<'info, Stablecoin>,
 
+    /// Optional role assignment (not needed if caller is master authority)
     #[account(
         seeds = [ROLE_SEED, stablecoin.key().as_ref(), Role::Blacklister.to_seed(), blacklister.key().as_ref()],
-        bump = role_assignment.bump,
+        bump,
     )]
-    pub role_assignment: Account<'info, RoleAssignment>,
+    pub role_assignment: Option<Account<'info, RoleAssignment>>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = blacklister,
         space = BlacklistEntry::LEN,
         seeds = [BLACKLIST_SEED, stablecoin.key().as_ref(), address.as_ref()],
@@ -168,15 +167,15 @@ pub struct BlacklistRemove<'info> {
     )]
     pub stablecoin: Account<'info, Stablecoin>,
 
+    /// Optional role assignment (not needed if caller is master authority)
     #[account(
         seeds = [ROLE_SEED, stablecoin.key().as_ref(), Role::Blacklister.to_seed(), blacklister.key().as_ref()],
-        bump = role_assignment.bump,
+        bump,
     )]
-    pub role_assignment: Account<'info, RoleAssignment>,
+    pub role_assignment: Option<Account<'info, RoleAssignment>>,
 
     #[account(
         mut,
-        close = blacklister,
         seeds = [BLACKLIST_SEED, stablecoin.key().as_ref(), address.as_ref()],
         bump = blacklist_entry.bump,
     )]
@@ -197,13 +196,14 @@ pub struct Seize<'info> {
     #[account(constraint = mint.key() == stablecoin.mint)]
     pub mint: InterfaceAccount<'info, Mint>,
 
+    /// Optional role assignment (not needed if caller is master authority)
     #[account(
         seeds = [ROLE_SEED, stablecoin.key().as_ref(), Role::Seizer.to_seed(), seizer.key().as_ref()],
-        bump = role_assignment.bump,
+        bump,
     )]
-    pub role_assignment: Account<'info, RoleAssignment>,
+    pub role_assignment: Option<Account<'info, RoleAssignment>>,
 
-    /// Blacklist entry must exist — proves the target is blacklisted
+    /// Blacklist entry must exist and be active — proves the target is blacklisted
     #[account(
         seeds = [BLACKLIST_SEED, stablecoin.key().as_ref(), source_account.owner.as_ref()],
         bump = blacklist_entry.bump,

@@ -26,6 +26,8 @@ pub struct Stablecoin {
     pub enable_transfer_hook: bool,
     /// SSS-2: whether new accounts start frozen (default_account_frozen)
     pub default_account_frozen: bool,
+    /// SSS-3: allowlist enabled (restricts transfers to pre-approved addresses)
+    pub enable_allowlist: bool,
     /// Total minted supply tracked on-chain
     pub total_minted: u64,
     /// Total burned tracked on-chain
@@ -37,7 +39,7 @@ pub struct Stablecoin {
     /// PDA bump
     pub bump: u8,
     /// Reserved for future upgrades
-    pub _reserved: [u8; 24],
+    pub _reserved: [u8; 23],
 }
 
 impl Stablecoin {
@@ -52,12 +54,13 @@ impl Stablecoin {
         1 +                        // enable_permanent_delegate
         1 +                        // enable_transfer_hook
         1 +                        // default_account_frozen
+        1 +                        // enable_allowlist
         8 +                        // total_minted
         8 +                        // total_burned
         8 +                        // supply_cap
         32 +                       // pending_authority
         1 +                        // bump
-        24;                        // _reserved
+        23;                        // _reserved
 
     pub fn is_compliance_enabled(&self) -> bool {
         self.enable_permanent_delegate || self.enable_transfer_hook
@@ -103,6 +106,7 @@ impl MinterInfo {
 
 /// Blacklist entry for SSS-2 compliance.
 /// Seeds: ["blacklist", stablecoin_pubkey, address_pubkey]
+/// Entries are never deleted — they are deactivated to preserve the audit trail.
 #[account]
 pub struct BlacklistEntry {
     pub stablecoin: Pubkey,
@@ -110,11 +114,28 @@ pub struct BlacklistEntry {
     pub reason: String,
     pub blacklisted_at: i64,
     pub blacklisted_by: Pubkey,
+    /// Whether this entry is currently active
+    pub active: bool,
     pub bump: u8,
 }
 
 impl BlacklistEntry {
-    pub const LEN: usize = 8 + 32 + 32 + (4 + MAX_REASON_LEN) + 8 + 32 + 1;
+    pub const LEN: usize = 8 + 32 + 32 + (4 + MAX_REASON_LEN) + 8 + 32 + 1 + 1;
+}
+
+/// Allowlist entry for SSS-3 privacy-preserving compliance.
+/// Seeds: ["allowlist", stablecoin_pubkey, address_pubkey]
+#[account]
+pub struct AllowlistEntry {
+    pub stablecoin: Pubkey,
+    pub address: Pubkey,
+    pub added_at: i64,
+    pub added_by: Pubkey,
+    pub bump: u8,
+}
+
+impl AllowlistEntry {
+    pub const LEN: usize = 8 + 32 + 32 + 8 + 32 + 1;
 }
 
 /// Roles in the stablecoin system.
@@ -168,6 +189,8 @@ pub struct StablecoinInitConfig {
     pub enable_transfer_hook: bool,
     /// SSS-2: new accounts start frozen until explicitly thawed
     pub default_account_frozen: bool,
+    /// SSS-3: enable allowlist (restricts transfers to pre-approved addresses)
+    pub enable_allowlist: bool,
     /// Optional supply cap (None or 0 = unlimited)
     pub supply_cap: Option<u64>,
 }
@@ -183,6 +206,7 @@ impl StablecoinInitConfig {
             enable_permanent_delegate: false,
             enable_transfer_hook: false,
             default_account_frozen: false,
+            enable_allowlist: false,
             supply_cap: None,
         }
     }
@@ -197,6 +221,27 @@ impl StablecoinInitConfig {
             enable_permanent_delegate: true,
             enable_transfer_hook: true,
             default_account_frozen: false,
+            enable_allowlist: false,
+            supply_cap: None,
+        }
+    }
+
+    /// SSS-3 preset: private stablecoin with allowlist-gated compliance.
+    /// Builds on SSS-2 (permanent delegate + transfer hook) and adds allowlist
+    /// enforcement. Designed for privacy-preserving stablecoins where transfer
+    /// hooks enforce allowlist checks instead of (or alongside) blacklists.
+    /// Note: Full confidential transfers require client-side ZK proof generation
+    /// which is handled by the SDK's PrivacyModule.
+    pub fn sss3(name: String, symbol: String, uri: String, decimals: u8) -> Self {
+        Self {
+            name,
+            symbol,
+            uri,
+            decimals,
+            enable_permanent_delegate: true,
+            enable_transfer_hook: true,
+            default_account_frozen: false,
+            enable_allowlist: true,
             supply_cap: None,
         }
     }
