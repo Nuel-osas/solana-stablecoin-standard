@@ -2,32 +2,33 @@
 
 A modular SDK with opinionated presets covering the most common stablecoin architectures on Solana. Built on Token-2022 extensions.
 
-Think **OpenZeppelin for stablecoins**: the library is the SDK, the standards (SSS-1, SSS-2) are opinionated presets that get adopted.
+Think **OpenZeppelin for stablecoins**: the library is the SDK, the standards (SSS-1, SSS-2, SSS-3) are opinionated presets that get adopted.
 
 ## Devnet Deployment
 
 Both programs are live on Solana Devnet:
 
-| Program | Program ID | Deploy Tx |
-|---------|-----------|-----------|
-| **sss_token** | [`BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq`](https://explorer.solana.com/address/BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq?cluster=devnet) | [`3XS74f...SvhN79`](https://explorer.solana.com/tx/3XS74f8ofykb2fjiQWS3fzH6sTFMPkkW4JA85U43K6aWxsgPZraYa85NhuHLg5t2noXs6MQrv6ZgE7tSQ9SvhN79?cluster=devnet) |
-| **sss_transfer_hook** | [`B9HzG9fuxbuJBG2wTSP6UmxBSQLdaUAk62Kcdf41WxAt`](https://explorer.solana.com/address/B9HzG9fuxbuJBG2wTSP6UmxBSQLdaUAk62Kcdf41WxAt?cluster=devnet) | [`5QbKdk...PeSY1NU`](https://explorer.solana.com/tx/5QbKdkonnMv8X9wvNRFvCkozhEoCnCRxAwApgvaWzuHmHhGEGgtuurLz6C5piiqH4ywb5dhhAo5pfHExkKPSY1NU?cluster=devnet) |
+| Program | Program ID |
+|---------|-----------|
+| **sss_token** | [`BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq`](https://explorer.solana.com/address/BXG5KG57ef5vgZdA4mWjBYfrFPyaaZEvdHCmGsuj7vbq?cluster=devnet) |
+| **sss_transfer_hook** | [`B9HzG9fuxbuJBG2wTSP6UmxBSQLdaUAk62Kcdf41WxAt`](https://explorer.solana.com/address/B9HzG9fuxbuJBG2wTSP6UmxBSQLdaUAk62Kcdf41WxAt?cluster=devnet) |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│              Layer 3 — Standard Presets          │
-│  SSS-1 (Minimal)    SSS-2 (Compliant)           │
-├─────────────────────────────────────────────────┤
-│              Layer 2 — Modules                   │
-│  Compliance Module                               │
-│  (Transfer Hook, Blacklist, Permanent Delegate)  │
-├─────────────────────────────────────────────────┤
-│              Layer 1 — Base SDK                  │
-│  Token Creation · Mint/Freeze Authority          │
-│  Role Management · CLI · TypeScript SDK          │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│               Layer 3 — Standard Presets             │
+│  SSS-1 (Minimal)  SSS-2 (Compliant)  SSS-3 (Private)│
+├─────────────────────────────────────────────────────┤
+│               Layer 2 — Modules                      │
+│  Compliance Module (Blacklist + Allowlist)            │
+│  Transfer Hook (Blacklist & Allowlist Enforcement)    │
+│  Permanent Delegate (Token Seizure)                  │
+├─────────────────────────────────────────────────────┤
+│               Layer 1 — Base SDK                     │
+│  Token Creation · Mint/Freeze Authority              │
+│  Role Management · CLI · TypeScript SDK              │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## Standards
@@ -36,6 +37,7 @@ Both programs are live on Solana Devnet:
 |----------|------|-------------|
 | **SSS-1** | Minimal Stablecoin | Mint authority + freeze authority + metadata. What's needed on every stable, nothing more. |
 | **SSS-2** | Compliant Stablecoin | SSS-1 + permanent delegate + transfer hook + blacklist enforcement. USDC/USDT-class compliance. |
+| **SSS-3** | Private Stablecoin | SSS-2 + allowlist-gated transfers. Only pre-approved addresses can send/receive. For institutional, permissioned, or jurisdiction-restricted tokens. |
 
 ## Quick Start
 
@@ -48,6 +50,9 @@ sss-token init sss-1 --name "My Stablecoin" --symbol "MUSD" --decimals 6
 # SSS-2: Compliant
 sss-token init sss-2 --name "Regulated USD" --symbol "RUSD" --decimals 6
 
+# SSS-3: Private (allowlist-gated)
+sss-token init sss-3 --name "Private USD" --symbol "PUSD" --decimals 6
+
 # Custom config
 sss-token init custom --config config.toml
 ```
@@ -56,42 +61,50 @@ sss-token init custom --config config.toml
 
 ```bash
 # Mint tokens
-sss-token mint --to <recipient> --amount 1000000
+sss-token mint --to <recipient> --amount 1000000 --mint <address>
 
 # Burn tokens
-sss-token burn --amount 500000
+sss-token burn --amount 500000 --mint <address>
 
 # Freeze/thaw accounts
-sss-token freeze --account <address>
-sss-token thaw --account <address>
+sss-token freeze --account <address> --mint <address>
+sss-token thaw --account <address> --mint <address>
 
 # Pause/unpause all operations
-sss-token pause
-sss-token unpause
+sss-token pause --mint <address>
+sss-token unpause --mint <address>
 
 # Check status
-sss-token status
-sss-token supply
+sss-token status --mint <address>
+sss-token supply --mint <address>
 ```
 
 ### SSS-2 Compliance
 
 ```bash
 # Blacklist management
-sss-token blacklist add --address <address> --reason "OFAC match"
-sss-token blacklist remove --address <address>
+sss-token blacklist add --address <address> --reason "OFAC match" --mint <address>
+sss-token blacklist remove --address <address> --mint <address>
 
 # Seize tokens (via permanent delegate)
-sss-token seize --from <address> --to <treasury>
+sss-token seize --from <token-account> --to <treasury> --mint <address>
 
 # Minter management
-sss-token minters list
-sss-token minters add --address <address> --quota 1000000
-sss-token minters remove --address <address>
+sss-token minters list --mint <address>
+sss-token minters add --address <address> --mint <address>
+sss-token minters remove --address <address> --mint <address>
 
 # Audit
-sss-token audit-log --action mint
-sss-token holders --min-balance 1000
+sss-token audit-log --mint <address>
+sss-token holders --mint <address>
+```
+
+### SSS-3 Allowlist
+
+```bash
+# Allowlist management (authority-only)
+sss-token allowlist add --address <address> --mint <address>
+sss-token allowlist remove --address <address> --mint <address>
 ```
 
 ### TypeScript SDK
@@ -99,27 +112,54 @@ sss-token holders --min-balance 1000
 ```typescript
 import { SolanaStablecoin, Presets } from "@stbr/sss-token";
 
-// SSS-2 preset
-const stable = await SolanaStablecoin.create(connection, {
-  preset: Presets.SSS_2,
+// SSS-1: Minimal
+const minimal = await SolanaStablecoin.create(connection, {
+  preset: Presets.SSS_1,
   name: "My Stablecoin",
   symbol: "MYUSD",
-  decimals: 6,
   authority: adminKeypair,
 });
 
-// Or custom config
-const custom = await SolanaStablecoin.create(connection, {
-  name: "Custom Stable",
-  symbol: "CUSD",
-  extensions: { permanentDelegate: true, transferHook: false },
+// SSS-2: Compliant
+const compliant = await SolanaStablecoin.create(connection, {
+  preset: Presets.SSS_2,
+  name: "Regulated USD",
+  symbol: "RUSD",
+  authority: adminKeypair,
+});
+
+// SSS-3: Private (allowlist-gated)
+const private = await SolanaStablecoin.create(connection, {
+  preset: Presets.SSS_3,
+  name: "Private USD",
+  symbol: "PUSD",
+  authority: adminKeypair,
 });
 
 // Operations
-await stable.mintTokens({ recipient, amount: 1_000_000, minter });
-await stable.compliance.blacklistAdd(address, "Sanctions match");
-await stable.compliance.seize(frozenAccount, treasury);
-const supply = await stable.getTotalSupply();
+await compliant.mintTokens({ recipientTokenAccount, amount: 1_000_000, minter });
+await compliant.burn({ amount: 500_000, burner, tokenAccount });
+await compliant.assignRole({ role: "minter", assignee: minterPubkey, authority });
+
+// Compliance (SSS-2/SSS-3)
+await compliant.compliance.blacklistAdd(address, "Sanctions match", blacklisterKeypair);
+await compliant.compliance.blacklistRemove(address, blacklisterKeypair);
+await compliant.compliance.seize({ sourceAccount, treasuryAccount, seizer });
+const isBlacklisted = await compliant.compliance.isBlacklisted(address);
+
+// Allowlist (SSS-3)
+await private.compliance.allowlistAdd(address, authorityKeypair);
+await private.compliance.allowlistRemove(address, authorityKeypair);
+const isAllowed = await private.compliance.isAllowlisted(address);
+
+// Authority management
+await compliant.nominateAuthority(currentAuthority, newAuthorityPubkey);
+await compliant.acceptAuthority(newAuthorityKeypair);
+await compliant.setSupplyCap(authority, 1_000_000_000);
+
+// State
+const state = await compliant.getState();
+const supply = await compliant.getTotalSupply();
 ```
 
 ## Project Structure
@@ -127,29 +167,37 @@ const supply = await stable.getTotalSupply();
 ```
 solana-stablecoin-standard/
 ├── programs/
-│   ├── sss-token/           # Core Anchor program (SSS-1 + SSS-2)
+│   ├── sss-token/               # Core Anchor program (SSS-1 + SSS-2 + SSS-3)
 │   │   └── src/
-│   │       ├── lib.rs        # Program entrypoint
-│   │       ├── state.rs      # Account definitions
-│   │       ├── instructions/ # All instruction handlers
-│   │       ├── error.rs      # Error codes
-│   │       ├── events.rs     # Event definitions
-│   │       └── constants.rs  # Seeds and limits
-│   └── sss-transfer-hook/   # Transfer hook program (SSS-2 blacklist enforcement)
+│   │       ├── lib.rs            # Program entrypoint
+│   │       ├── state.rs          # Account definitions
+│   │       ├── instructions/     # All instruction handlers
+│   │       │   ├── initialize.rs # Token + stablecoin init
+│   │       │   ├── mint.rs       # Mint with quota + cap enforcement
+│   │       │   ├── burn.rs       # Burn with supply tracking
+│   │       │   ├── freeze.rs     # Freeze/thaw accounts
+│   │       │   ├── pause.rs      # Global pause/unpause
+│   │       │   ├── roles.rs      # RBAC, authority transfer, supply cap
+│   │       │   ├── compliance.rs # Blacklist + seize (SSS-2)
+│   │       │   └── allowlist.rs  # Allowlist management (SSS-3)
+│   │       ├── error.rs          # Error codes
+│   │       ├── events.rs         # Event definitions (all timestamped)
+│   │       └── constants.rs      # Seeds and limits
+│   └── sss-transfer-hook/       # Transfer hook (blacklist + allowlist enforcement)
 ├── sdk/
-│   └── core/                # TypeScript SDK (@stbr/sss-token)
-├── cli/                     # Admin CLI (sss-token)
-├── backend/                 # Backend services (Docker)
-├── tests/                   # Integration tests
-├── docs/                    # Documentation
-│   ├── ARCHITECTURE.md
-│   ├── SSS-1.md
-│   ├── SSS-2.md
-│   ├── SDK.md
-│   ├── OPERATIONS.md
-│   ├── COMPLIANCE.md
-│   └── API.md
-└── Anchor.toml              # Anchor workspace config
+│   └── core/                    # TypeScript SDK (@stbr/sss-token)
+├── cli/                         # Admin CLI (sss-token)
+├── backend/                     # Backend services (Docker)
+├── tests/                       # 57 integration tests
+│   ├── sss-1.ts                 # SSS-1 tests (7)
+│   ├── sss-2.ts                 # SSS-2 compliance tests (7)
+│   ├── sss-3.ts                 # SSS-3 allowlist tests (10)
+│   ├── authority.ts             # Authority transfer tests (7)
+│   ├── supply-cap.ts            # Supply cap + quota tests (10)
+│   └── roles-edge-cases.ts      # Roles edge cases (16)
+├── trident-tests/               # Trident fuzz tests
+├── docs/                        # Documentation
+└── Anchor.toml                  # Anchor workspace config
 ```
 
 ## Role-Based Access Control
@@ -158,49 +206,62 @@ No single key controls everything:
 
 | Role | Capabilities |
 |------|-------------|
-| **Master Authority** | Assign/revoke all roles, transfer authority (two-step), set supply cap |
+| **Master Authority** | Assign/revoke all roles, transfer authority (two-step), set supply cap, manage allowlist |
 | **Minter** | Mint tokens (with per-minter quotas) |
 | **Burner** | Burn tokens |
 | **Pauser** | Pause/unpause, freeze/thaw accounts |
-| **Blacklister** | Add/remove from blacklist (SSS-2) |
-| **Seizer** | Seize tokens via permanent delegate (SSS-2) |
+| **Blacklister** | Add/remove from blacklist (SSS-2/SSS-3) |
+| **Seizer** | Seize tokens via permanent delegate (SSS-2/SSS-3) |
+
+Master authority can also perform any role's action directly without needing a role assignment.
 
 ## Security Features
 
-- **Two-step authority transfer**: `nominate_authority` → `accept_authority` prevents loss from typos (inspired by Circle FiatToken v2)
+- **Two-step authority transfer**: `nominate_authority` -> `accept_authority` prevents loss from typos (inspired by Circle FiatToken v2)
 - **Supply cap enforcement**: Optional `supply_cap` enforced at the program level on every mint
+- **Per-minter quotas**: Individual minting limits tracked on-chain
+- **Blacklist audit trail**: Deactivation instead of deletion — full on-chain history preserved
+- **Event timestamps**: Every event emission includes `Clock::get()` timestamp for auditability
 - **`security_txt!` macro**: Both programs embed [security.txt](https://github.com/nickelreads/solana-security-txt) for responsible disclosure
 - **Role separation**: No single key controls everything — see RBAC table above
-- **Immutable compliance config**: SSS-1/SSS-2 extensions set at init, cannot be changed afterward
+- **Immutable compliance config**: SSS-1/SSS-2/SSS-3 extensions set at init, cannot be changed afterward
 - **PDA authority model**: All sensitive operations use program-derived authority, not EOA keys
 
 ## Token-2022 Extensions Used
 
-| Extension | SSS-1 | SSS-2 | Purpose |
-|-----------|-------|-------|---------|
-| Metadata Pointer | ✓ | ✓ | On-chain metadata |
-| Mint/Freeze Authority | ✓ | ✓ | Token control |
-| Permanent Delegate | | ✓ | Token seizure |
-| Transfer Hook | | ✓ | Blacklist enforcement on every transfer |
-| Default Account State | | Optional | Freeze new accounts by default |
+| Extension | SSS-1 | SSS-2 | SSS-3 | Purpose |
+|-----------|-------|-------|-------|---------|
+| Metadata Pointer | Yes | Yes | Yes | On-chain metadata |
+| Mint/Freeze Authority | Yes | Yes | Yes | Token control |
+| Permanent Delegate | | Yes | Yes | Token seizure |
+| Transfer Hook | | Yes | Yes | Blacklist + allowlist enforcement on every transfer |
+| Default Account State | | Optional | Optional | Freeze new accounts by default |
 
 ## Testing
 
-### Anchor Integration Tests
+57 integration tests across 6 test suites, all passing:
+
+```
+  SSS-1: Minimal Stablecoin (7 tests)
+  SSS-2: Compliant Stablecoin (7 tests)
+  SSS-3: Private Stablecoin — Allowlist (10 tests)
+  Authority Transfer (7 tests)
+  Supply Cap & Minter Quotas (10 tests)
+  Roles Edge Cases (16 tests)
+
+  57 passing
+```
+
+### Run Tests
 
 ```bash
+# Anchor integration tests (57 tests)
 anchor test
-```
 
-### SDK Unit Tests
-
-```bash
+# SDK unit tests
 cd sdk/core && yarn test
-```
 
-### Backend API Tests
-
-```bash
+# Backend API tests
 cd backend && yarn test
 ```
 
@@ -209,31 +270,20 @@ cd backend && yarn test
 Builds and starts the full containerised stack (API + indexer), then runs 6 end-to-end checks against the live endpoints.
 
 ```bash
-# Requires a Docker runtime (Docker Desktop or colima)
 colima start          # if using colima
 cd backend/docker
 ./smoke-test.sh
 ```
-
-The smoke test covers: health check, supply endpoint, events endpoint, audit log, and input validation on mint/blacklist write endpoints.
 
 ### Trident Fuzz Testing
 
 Property-based fuzz testing via [Trident](https://github.com/Ackee-Blockchain/trident) (Ackee Blockchain). The harness executes real program instructions through `process_transaction` against a local SVM and checks invariants after each flow.
 
 ```bash
-# Build programs first (Trident loads the .so binaries)
 anchor build
-
-# Run the fuzz test (default: 1000 iterations, 100 flow calls each)
 cd trident-tests/fuzz_tests/fuzz_0
 cargo run
-
-# Custom iteration count
-TRIDENT_ITERATIONS=5000 TRIDENT_FLOW_CALLS=200 cargo run
 ```
-
-Fuzz flows cover: pause/unpause by authority, unauthorized pause/transfer rejection, authority transfer verification, and PDA uniqueness invariants across all role types.
 
 ## Development
 
