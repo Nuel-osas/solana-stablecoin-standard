@@ -1622,8 +1622,8 @@ cli
       const minter = new PublicKey(opts.address);
       const [stablecoinPDA] = getStablecoinPDA(mint);
       const [minterInfo] = getMinterInfoPDA(stablecoinPDA, minter);
-      const stablecoinData = await program.account.stablecoin.fetch(stablecoinPDA);
-      const decimals = (stablecoinData as any).decimals;
+      const stablecoinData = await (program.account as any).stablecoin.fetch(stablecoinPDA);
+      const decimals = stablecoinData.decimals;
       const quota = opts.quota === "0" ? new BN(0) : new BN(Math.round(parseFloat(opts.quota) * Math.pow(10, decimals)));
 
       console.log(`\nUpdating quota for minter: ${minter.toBase58()}`);
