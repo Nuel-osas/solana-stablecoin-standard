@@ -13,5 +13,6 @@ export type {
   ThawParams,
   BlacklistParams,
   SeizeParams,
+  TransferParams,
 } from "./types";
 export type { PriceData, PegStatus, FeedAlias } from "./oracle";

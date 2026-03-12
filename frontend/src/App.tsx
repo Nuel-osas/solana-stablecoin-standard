@@ -24,6 +24,7 @@ import Authority from "./pages/Authority";
 import MinterQuotas from "./pages/MinterQuotas";
 import Metadata from "./pages/Metadata";
 import AuditLog from "./pages/AuditLog";
+import Transfer from "./pages/Transfer";
 
 export default function App() {
   const endpoint = useMemo(() => clusterApiUrl("devnet"), []);
@@ -88,6 +89,10 @@ export default function App() {
                   <Route
                     path="/minter-quotas"
                     element={<MinterQuotas mintAddress={mintAddress} />}
+                  />
+                  <Route
+                    path="/transfer"
+                    element={<Transfer mintAddress={mintAddress} />}
                   />
                   <Route
                     path="/audit-log"

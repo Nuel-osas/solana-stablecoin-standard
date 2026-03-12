@@ -12,12 +12,7 @@ interface Props {
 }
 
 interface TokenMetadata {
-  name?: string;
-  symbol?: string;
-  description?: string;
   image?: string;
-  external_url?: string;
-  attributes?: { trait_type: string; value: string }[];
 }
 
 export default function Metadata({ mintAddress }: Props) {
@@ -33,6 +28,12 @@ export default function Metadata({ mintAddress }: Props) {
   useEffect(() => {
     if (!state?.uri) { setMetadata(null); return; }
     setImageError(false);
+    // If URI looks like a direct image, use it directly
+    if (/\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i.test(state.uri)) {
+      setMetadata({ image: state.uri });
+      return;
+    }
+    // Otherwise try to parse as JSON
     fetch(state.uri)
       .then((res) => res.json())
       .then((data) => setMetadata(data))
@@ -115,29 +116,15 @@ export default function Metadata({ mintAddress }: Props) {
           </div>
         </div>
 
-        {/* Token image + metadata from URI */}
+        {/* Token image from URI */}
         {metadata?.image && !imageError && (
-          <div className="mt-6 flex items-start gap-5 pt-4 border-t border-slate-800/50">
+          <div className="mt-6 pt-4 border-t border-slate-800/50">
             <img
               src={metadata.image}
-              alt={metadata.name || "Token logo"}
+              alt="Token logo"
               onError={() => setImageError(true)}
               className="w-20 h-20 rounded-xl object-cover border border-slate-700"
             />
-            <div className="flex-1 space-y-1">
-              {metadata.description && (
-                <p className="text-sm text-slate-300">{metadata.description}</p>
-              )}
-              {metadata.attributes && metadata.attributes.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {metadata.attributes.map((attr, i) => (
-                    <span key={i} className="text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded">
-                      {attr.trait_type}: <span className="text-slate-200">{attr.value}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>

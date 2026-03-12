@@ -90,3 +90,9 @@ export interface SeizeParams {
   treasuryAccount: PublicKey;
   seizer: Keypair;
 }
+
+export interface TransferParams {
+  sender: Keypair;
+  recipient: PublicKey;
+  amount: number | anchor.BN;
+}
