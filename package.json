@@ -7,6 +7,9 @@
     "sdk/core",
     "tui"
   ],
+  "bin": {
+    "sss-token": "./cli/bin/sss-token.js"
+  },
   "scripts": {
     "build": "yarn workspaces run build",
     "test": "anchor test",

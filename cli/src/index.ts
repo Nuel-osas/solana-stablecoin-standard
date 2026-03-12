@@ -97,6 +97,9 @@ function getConnection(cluster: string): Connection {
   if (cluster === "localnet") {
     return new Connection("http://localhost:8899", "confirmed");
   }
+  if (cluster.startsWith("http")) {
+    return new Connection(cluster, "confirmed");
+  }
   return new Connection(clusterApiUrl(cluster as any), "confirmed");
 }
 
