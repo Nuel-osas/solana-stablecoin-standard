@@ -7,4 +7,5 @@ test-ledger/
 *.so
 *.dylib
 yarn-error.log
+.env
 .env.local

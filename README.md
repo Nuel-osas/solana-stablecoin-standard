@@ -45,42 +45,42 @@ Both programs are live on Solana Devnet:
 
 ```bash
 yarn install
-yarn cli --help
+sss-token --help
 ```
 
 ### Initialize a stablecoin
 
 ```bash
 # SSS-1: Minimal
-yarn cli init sss-1 --name "My Stablecoin" --symbol "MUSD" --decimals 6
+sss-token init sss-1 --name "My Stablecoin" --symbol "MUSD" --decimals 6
 
 # SSS-2: Compliant
-yarn cli init sss-2 --name "Regulated USD" --symbol "RUSD" --decimals 6
+sss-token init sss-2 --name "Regulated USD" --symbol "RUSD" --decimals 6
 
 # SSS-3: Private (allowlist-gated)
-yarn cli init sss-3 --name "Private USD" --symbol "PUSD" --decimals 6
+sss-token init sss-3 --name "Private USD" --symbol "PUSD" --decimals 6
 ```
 
 ### Operations
 
 ```bash
 # Mint tokens (human-readable amounts, e.g. 1000 or 1.5)
-yarn cli mint --to <recipient> --amount 1000 --mint <address>
+sss-token mint --to <recipient> --amount 1000 --mint <address>
 
 # Burn tokens
-yarn cli burn --amount 1.5 --mint <address>
+sss-token burn --amount 1.5 --mint <address>
 
 # Freeze/thaw accounts
-yarn cli freeze --account <address> --mint <address>
-yarn cli thaw --account <address> --mint <address>
+sss-token freeze --account <address> --mint <address>
+sss-token thaw --account <address> --mint <address>
 
 # Pause/unpause all operations
-yarn cli pause --mint <address>
-yarn cli unpause --mint <address>
+sss-token pause --mint <address>
+sss-token unpause --mint <address>
 
 # Check status
-yarn cli status --mint <address>
-yarn cli supply --mint <address>
+sss-token status --mint <address>
+sss-token supply --mint <address>
 ```
 
 ### Metadata
@@ -95,7 +95,7 @@ The URI should point to a JSON file with an `image` field (Metaplex standard) so
 
 ```bash
 # CLI: update metadata URI
-yarn cli update-metadata --uri "https://example.com/metadata.json" --mint <address>
+sss-token update-metadata --uri "https://example.com/metadata.json" --mint <address>
 ```
 
 ```typescript
@@ -118,41 +118,41 @@ The frontend Metadata page fetches the URI JSON and displays the token logo, des
 
 ```bash
 # Assign any role (minter, burner, blacklister, pauser, seizer)
-yarn cli roles assign --role burner --address <address> --mint <address>
-yarn cli roles assign --role minter --address <address> --mint <address>
+sss-token roles assign --role burner --address <address> --mint <address>
+sss-token roles assign --role minter --address <address> --mint <address>
 
 # Revoke a role
-yarn cli roles revoke --role burner --address <address> --mint <address>
+sss-token roles revoke --role burner --address <address> --mint <address>
 
 # List all active role assignments
-yarn cli roles list --mint <address>
-yarn cli roles list --mint <address> --role minter    # filter by role
+sss-token roles list --mint <address>
+sss-token roles list --mint <address> --role minter    # filter by role
 
 # Check what roles an address has
-yarn cli roles check --address <address> --mint <address>
+sss-token roles check --address <address> --mint <address>
 ```
 
 ### SSS-2 Compliance
 
 ```bash
 # Transfer tokens (required for SSS-2/SSS-3 — wallets cannot resolve transfer hooks)
-yarn cli transfer --amount 100 --to <recipient> --mint <address>
+sss-token transfer --amount 100 --to <recipient> --mint <address>
 
 # Blacklist management
-yarn cli blacklist add --address <address> --reason "OFAC match" --mint <address>
-yarn cli blacklist remove --address <address> --mint <address>
+sss-token blacklist add --address <address> --reason "OFAC match" --mint <address>
+sss-token blacklist remove --address <address> --mint <address>
 
 # Seize tokens (via permanent delegate)
-yarn cli seize --from <token-account> --to <treasury> --mint <address>
+sss-token seize --from <token-account> --to <treasury> --mint <address>
 
 # Minter management (convenience shortcut for roles assign --role minter)
-yarn cli minters list --mint <address>
-yarn cli minters add --address <address> --mint <address>
-yarn cli minters remove --address <address> --mint <address>
+sss-token minters list --mint <address>
+sss-token minters add --address <address> --mint <address>
+sss-token minters remove --address <address> --mint <address>
 
 # Audit
-yarn cli audit-log --mint <address>
-yarn cli holders --mint <address>
+sss-token audit-log --mint <address>
+sss-token holders --mint <address>
 ```
 
 > **Why transfers require CLI/SDK/frontend**: SSS-2 and SSS-3 tokens use Token-2022 transfer hooks for blacklist/allowlist enforcement. Wallets like Phantom and Backpack cannot resolve the extra accounts the hook requires, so transfers fail with "Failed to generate a valid transaction". Use the CLI `transfer` command, SDK `transfer()` method, or the frontend Transfer page instead.
@@ -187,8 +187,8 @@ This makes the CLI accessible to operators who don't want to memorize command sy
 
 ```bash
 # Allowlist management (authority-only)
-yarn cli allowlist add --address <address> --mint <address>
-yarn cli allowlist remove --address <address> --mint <address>
+sss-token allowlist add --address <address> --mint <address>
+sss-token allowlist remove --address <address> --mint <address>
 ```
 
 ### TypeScript SDK
@@ -322,14 +322,14 @@ Optional on-chain price validation during mint/burn operations. When configured,
 
 ```bash
 # Configure oracle (authority-only)
-yarn cli configure-oracle \
+sss-token configure-oracle \
   --mint <address> \
   --price-feed <pyth-account> \
   --max-deviation 100 \
   --max-staleness 60
 
 # Disable oracle enforcement
-yarn cli configure-oracle --mint <address> --price-feed <pyth-account> --disable
+sss-token configure-oracle --mint <address> --price-feed <pyth-account> --disable
 ```
 
 ```typescript
