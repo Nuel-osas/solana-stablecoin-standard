@@ -129,7 +129,7 @@ pub mod sss_token {
 
     /// Seize tokens from a frozen/blacklisted account via permanent delegate.
     /// Caller must have seizer role. SSS-2 only.
-    pub fn seize(ctx: Context<Seize>) -> Result<()> {
+    pub fn seize<'a, 'b, 'c, 'info>(ctx: Context<'a, 'b, 'c, 'info, Seize<'info>>) -> Result<()> {
         instructions::compliance::seize_handler(ctx)
     }
 

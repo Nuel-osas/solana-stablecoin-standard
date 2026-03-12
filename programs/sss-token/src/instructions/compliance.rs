@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use anchor_lang::solana_program::program::invoke_signed;
 
 use crate::constants::*;
 use crate::error::SSSError;
@@ -71,7 +72,7 @@ pub fn remove_from_blacklist_handler(
     Ok(())
 }
 
-pub fn seize_handler(ctx: Context<Seize>) -> Result<()> {
+pub fn seize_handler<'a, 'b, 'c, 'info>(ctx: Context<'a, 'b, 'c, 'info, Seize<'info>>) -> Result<()> {
     let stablecoin = &ctx.accounts.stablecoin;
     require!(!stablecoin.paused, SSSError::Paused);
     require!(stablecoin.enable_permanent_delegate, SSSError::ComplianceNotEnabled);
@@ -97,20 +98,48 @@ pub fn seize_handler(ctx: Context<Seize>) -> Result<()> {
         &[stablecoin.bump],
     ];
 
-    token_2022::transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            token_2022::TransferChecked {
-                from: ctx.accounts.source_account.to_account_info(),
-                mint: ctx.accounts.mint.to_account_info(),
-                to: ctx.accounts.treasury_account.to_account_info(),
-                authority: ctx.accounts.stablecoin.to_account_info(),
-            },
-            &[seeds],
-        ),
-        amount,
-        stablecoin.decimals,
-    )?;
+    let signer_seeds: &[&[&[u8]]] = &[seeds];
+
+    // Build TransferChecked instruction data: discriminator (12) + amount (u64) + decimals (u8)
+    let mut ix_data = Vec::with_capacity(10);
+    ix_data.push(12u8); // TransferChecked discriminator
+    ix_data.extend_from_slice(&amount.to_le_bytes());
+    ix_data.push(stablecoin.decimals);
+
+    // Build account metas: source, mint, dest, authority + all remaining (hook extras)
+    let mut account_metas = vec![
+        AccountMeta::new(ctx.accounts.source_account.key(), false),
+        AccountMeta::new_readonly(ctx.accounts.mint.key(), false),
+        AccountMeta::new(ctx.accounts.treasury_account.key(), false),
+        AccountMeta::new_readonly(ctx.accounts.stablecoin.key(), true),
+    ];
+    for acc in ctx.remaining_accounts.iter() {
+        if acc.is_writable {
+            account_metas.push(AccountMeta::new(acc.key(), false));
+        } else {
+            account_metas.push(AccountMeta::new_readonly(acc.key(), false));
+        }
+    }
+
+    let transfer_ix = anchor_lang::solana_program::instruction::Instruction {
+        program_id: ctx.accounts.token_program.key(),
+        accounts: account_metas,
+        data: ix_data,
+    };
+
+    // Collect all account infos for invoke_signed
+    let mut account_infos = vec![
+        ctx.accounts.source_account.to_account_info(),
+        ctx.accounts.mint.to_account_info(),
+        ctx.accounts.treasury_account.to_account_info(),
+        ctx.accounts.stablecoin.to_account_info(),
+    ];
+    for acc in ctx.remaining_accounts.iter() {
+        account_infos.push(acc.to_account_info());
+    }
+    account_infos.push(ctx.accounts.token_program.to_account_info());
+
+    invoke_signed(&transfer_ix, &account_infos, signer_seeds)?;
 
     emit!(events::TokensSeized {
         mint: ctx.accounts.mint.key(),

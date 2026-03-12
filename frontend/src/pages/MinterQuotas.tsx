@@ -62,7 +62,7 @@ export default function MinterQuotas({ mintAddress }: Props) {
       const minterInfo = await (program.account as any).minterInfo.fetch(minterInfoPDA);
       const decimals = state.decimals;
       const quota = minterInfo.quota.toNumber();
-      const totalMinted = minterInfo.totalMinted.toNumber();
+      const totalMinted = minterInfo.minted.toNumber();
       const remaining = Math.max(0, quota - totalMinted);
 
       setQuotaInfo({

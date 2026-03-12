@@ -157,6 +157,32 @@ yarn cli holders --mint <address>
 
 > **Why transfers require CLI/SDK/frontend**: SSS-2 and SSS-3 tokens use Token-2022 transfer hooks for blacklist/allowlist enforcement. Wallets like Phantom and Backpack cannot resolve the extra accounts the hook requires, so transfers fail with "Failed to generate a valid transaction". Use the CLI `transfer` command, SDK `transfer()` method, or the frontend Transfer page instead.
 
+### AI-Powered Natural Language Interface
+
+The CLI includes a built-in AI assistant that translates plain English into the correct `sss-token` commands. Powered by Groq (free, fast inference on Llama 3.3 70B) and the `SKILLS.md` reference file.
+
+```bash
+# Just see the generated command
+sss-token ask "check the status of my stablecoin"
+# => sss-token status --mint <mint_address>
+
+# Generate AND execute automatically
+sss-token ask "blacklist address ABC on mint XYZ" --execute
+
+# Multi-step workflows are handled automatically
+sss-token ask "give wallet ABC minter role with 5000 quota on mint XYZ"
+# => sss-token roles assign --role minter --address ABC --mint XYZ
+# => sss-token update-minter-quota --address ABC --quota 5000 --mint XYZ
+```
+
+Set your Groq API key (free at [console.groq.com/keys](https://console.groq.com/keys)) in `.env`:
+
+```
+GROQ_API_KEY=gsk_your_key_here
+```
+
+This makes the CLI accessible to operators who don't want to memorize command syntax — just describe what you want in plain English.
+
 ### SSS-3 Allowlist
 
 ```bash
