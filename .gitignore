@@ -9,3 +9,5 @@ test-ledger/
 yarn-error.log
 .env
 .env.local
+evidence/.smoke-test-*.json
+evidence/devnet-smoke-test.log
