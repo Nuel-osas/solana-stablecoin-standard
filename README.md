@@ -1,6 +1,7 @@
 # Solana Stablecoin Standard (SSS)
 
 [![CI](https://github.com/Nuel-osas/solana-stablecoin-standard-1/actions/workflows/ci.yml/badge.svg)](https://github.com/Nuel-osas/solana-stablecoin-standard-1/actions/workflows/ci.yml)
+[![Frontend](https://img.shields.io/badge/Live%20Demo-solana--stablecoin--standard-blue)](https://solana-stablecoin-standard-1.vercel.app/)
 
 A modular SDK with opinionated presets covering the most common stablecoin architectures on Solana. Built on Token-2022 extensions.
 
