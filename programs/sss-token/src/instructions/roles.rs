@@ -163,6 +163,53 @@ pub fn set_supply_cap_handler(ctx: Context<SetSupplyCap>, supply_cap: u64) -> Re
     Ok(())
 }
 
+/// Close a revoked (inactive) role assignment account and reclaim rent.
+/// Only master authority can call this.
+pub fn close_role_handler(ctx: Context<CloseRole>, _role: Role, _assignee: Pubkey) -> Result<()> {
+    let stablecoin = &ctx.accounts.stablecoin;
+    require!(
+        ctx.accounts.authority.key() == stablecoin.authority,
+        SSSError::Unauthorized
+    );
+
+    let role_assignment = &ctx.accounts.role_assignment;
+    // Must already be revoked (inactive)
+    require!(!role_assignment.active, SSSError::AccountStillActive);
+
+    emit!(events::RoleClosed {
+        mint: stablecoin.mint,
+        role: role_assignment.role.to_string(),
+        assignee: role_assignment.assignee,
+        closed_by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
+    // Account closure handled by Anchor's `close = authority` constraint
+    Ok(())
+}
+
+/// Close a minter info account and reclaim rent.
+/// Only master authority can call this.
+pub fn close_minter_info_handler(ctx: Context<CloseMinterInfo>) -> Result<()> {
+    let stablecoin = &ctx.accounts.stablecoin;
+    require!(
+        ctx.accounts.authority.key() == stablecoin.authority,
+        SSSError::Unauthorized
+    );
+
+    let minter_info = &ctx.accounts.minter_info;
+
+    emit!(events::MinterInfoClosed {
+        mint: stablecoin.mint,
+        minter: minter_info.minter,
+        closed_by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
+    // Account closure handled by Anchor's `close = authority` constraint
+    Ok(())
+}
+
 /// Update the mint quota for a specific minter. Only master authority can call this.
 pub fn update_minter_quota_handler(ctx: Context<UpdateMinterQuota>, new_quota: u64) -> Result<()> {
     let stablecoin = &ctx.accounts.stablecoin;
@@ -303,6 +350,49 @@ pub struct UpdateMinterQuota<'info> {
 
     #[account(
         mut,
+        seeds = [MINTER_INFO_SEED, stablecoin.key().as_ref(), minter_info.minter.as_ref()],
+        bump = minter_info.bump,
+    )]
+    pub minter_info: Account<'info, MinterInfo>,
+}
+
+/// Accounts required to close a revoked role assignment and reclaim rent.
+#[derive(Accounts)]
+#[instruction(role: Role, assignee: Pubkey)]
+pub struct CloseRole<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [STABLECOIN_SEED, stablecoin.mint.as_ref()],
+        bump = stablecoin.bump,
+    )]
+    pub stablecoin: Account<'info, Stablecoin>,
+
+    #[account(
+        mut,
+        close = authority,
+        seeds = [ROLE_SEED, stablecoin.key().as_ref(), role.to_seed(), assignee.as_ref()],
+        bump = role_assignment.bump,
+    )]
+    pub role_assignment: Account<'info, RoleAssignment>,
+}
+
+/// Accounts required to close a minter info account and reclaim rent.
+#[derive(Accounts)]
+pub struct CloseMinterInfo<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [STABLECOIN_SEED, stablecoin.mint.as_ref()],
+        bump = stablecoin.bump,
+    )]
+    pub stablecoin: Account<'info, Stablecoin>,
+
+    #[account(
+        mut,
+        close = authority,
         seeds = [MINTER_INFO_SEED, stablecoin.key().as_ref(), minter_info.minter.as_ref()],
         bump = minter_info.bump,
     )]

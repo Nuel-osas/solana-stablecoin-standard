@@ -111,7 +111,7 @@ impl MinterInfo {
 
 /// Blacklist entry for SSS-2 compliance.
 /// Seeds: ["blacklist", stablecoin_pubkey, address_pubkey]
-/// Entries are never deleted — they are deactivated to preserve the audit trail.
+/// Entries can be deactivated and then closed to reclaim rent.
 #[account]
 pub struct BlacklistEntry {
     pub stablecoin: Pubkey,

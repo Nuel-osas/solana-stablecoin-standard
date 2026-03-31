@@ -51,4 +51,6 @@ pub enum SSSError {
     OraclePriceDepegged,
     #[msg("Invalid oracle price feed")]
     InvalidOracleFeed,
+    #[msg("Account is still active — deactivate before closing")]
+    AccountStillActive,
 }

@@ -46,7 +46,9 @@ pub fn add_to_blacklist_handler(
     Ok(())
 }
 
-/// Deactivate a blacklist entry (entries are never deleted to preserve audit trail).
+/// Remove an address from the blacklist: deactivates the entry AND closes the account
+/// to reclaim rent. The `close = blacklister` constraint on BlacklistRemove handles
+/// the actual account closure after the handler returns.
 pub fn remove_from_blacklist_handler(
     ctx: Context<BlacklistRemove>,
     _address: Pubkey,
@@ -61,17 +63,58 @@ pub fn remove_from_blacklist_handler(
         .unwrap_or(false);
     require!(is_master || is_blacklister, SSSError::Unauthorized);
 
-    let blacklist_entry = &mut ctx.accounts.blacklist_entry;
+    let blacklist_entry = &ctx.accounts.blacklist_entry;
     require!(blacklist_entry.active, SSSError::NotBlacklisted);
-    blacklist_entry.active = false;
 
+    let clock = Clock::get()?;
+
+    // Emit both events before Anchor closes the account
     emit!(events::BlacklistRemoved {
         mint: stablecoin.mint,
         address: blacklist_entry.address,
         by: ctx.accounts.blacklister.key(),
+        timestamp: clock.unix_timestamp,
+    });
+
+    emit!(events::BlacklistEntryClosed {
+        mint: stablecoin.mint,
+        address: blacklist_entry.address,
+        closed_by: ctx.accounts.blacklister.key(),
+        timestamp: clock.unix_timestamp,
+    });
+
+    Ok(())
+}
+
+/// Close a blacklist entry that has already been deactivated.
+/// Use this when someone previously deactivated an entry (set active = false)
+/// but did not close the account to reclaim rent.
+pub fn close_blacklist_entry_handler(
+    ctx: Context<CloseBlacklistEntry>,
+    _address: Pubkey,
+) -> Result<()> {
+    let stablecoin = &ctx.accounts.stablecoin;
+    require!(stablecoin.is_compliance_enabled(), SSSError::ComplianceNotEnabled);
+
+    // Verify blacklister role or master authority
+    let is_master = ctx.accounts.authority.key() == stablecoin.authority;
+    let is_blacklister = ctx.accounts.role_assignment.as_ref()
+        .map(|r| r.active && r.role == Role::Blacklister && r.assignee == ctx.accounts.authority.key())
+        .unwrap_or(false);
+    require!(is_master || is_blacklister, SSSError::Unauthorized);
+
+    let blacklist_entry = &ctx.accounts.blacklist_entry;
+    // Must already be deactivated
+    require!(!blacklist_entry.active, SSSError::AccountStillActive);
+
+    emit!(events::BlacklistEntryClosed {
+        mint: stablecoin.mint,
+        address: blacklist_entry.address,
+        closed_by: ctx.accounts.authority.key(),
         timestamp: Clock::get()?.unix_timestamp,
     });
 
+    // Account closure handled by Anchor's `close = authority` constraint
     Ok(())
 }
 
@@ -192,6 +235,7 @@ pub struct BlacklistAdd<'info> {
 }
 
 /// Accounts required to remove an address from the blacklist.
+/// The blacklist entry account is closed and rent returned to the blacklister.
 #[derive(Accounts)]
 #[instruction(address: Pubkey)]
 pub struct BlacklistRemove<'info> {
@@ -213,6 +257,37 @@ pub struct BlacklistRemove<'info> {
 
     #[account(
         mut,
+        close = blacklister,
+        seeds = [BLACKLIST_SEED, stablecoin.key().as_ref(), address.as_ref()],
+        bump = blacklist_entry.bump,
+    )]
+    pub blacklist_entry: Account<'info, BlacklistEntry>,
+}
+
+/// Accounts required to close an already-deactivated blacklist entry.
+/// Use this to reclaim rent from entries that were deactivated but not closed.
+#[derive(Accounts)]
+#[instruction(address: Pubkey)]
+pub struct CloseBlacklistEntry<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [STABLECOIN_SEED, stablecoin.mint.as_ref()],
+        bump = stablecoin.bump,
+    )]
+    pub stablecoin: Account<'info, Stablecoin>,
+
+    /// Optional role assignment (not needed if caller is master authority)
+    #[account(
+        seeds = [ROLE_SEED, stablecoin.key().as_ref(), Role::Blacklister.to_seed(), authority.key().as_ref()],
+        bump,
+    )]
+    pub role_assignment: Option<Account<'info, RoleAssignment>>,
+
+    #[account(
+        mut,
+        close = authority,
         seeds = [BLACKLIST_SEED, stablecoin.key().as_ref(), address.as_ref()],
         bump = blacklist_entry.bump,
     )]

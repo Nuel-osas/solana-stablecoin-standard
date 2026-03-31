@@ -108,6 +108,109 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   next();
 }
 
+// ============ Idempotency Keys ============
+//
+// Write endpoints (POST) support idempotency via the `X-Idempotency-Key` header.
+// When provided, the server caches the result of the request for 24 hours:
+//   - If the same key is sent while the original request is still processing, a 409 Conflict is returned.
+//   - If the same key is sent after the original completed successfully, the cached 200 response is returned.
+//   - If the same key is sent after the original failed, the cached error response is returned.
+// Keys are stored in-memory and expire after 24 hours. Expired entries are cleaned up every hour.
+//
+// Usage:  curl -X POST /api/v1/mint -H "X-Idempotency-Key: unique-request-id-123" ...
+
+interface IdempotencyEntry {
+  status: "processing" | "done" | "error";
+  statusCode?: number;
+  result?: any;
+  timestamp: number;
+}
+
+const idempotencyStore = new Map<string, IdempotencyEntry>();
+
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Cleanup expired entries every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of idempotencyStore) {
+    if (now - val.timestamp > IDEMPOTENCY_TTL_MS) {
+      idempotencyStore.delete(key);
+    }
+  }
+}, 60 * 60 * 1000);
+
+/**
+ * Wraps an async Express route handler with idempotency support.
+ * If the request includes an `X-Idempotency-Key` header, the middleware checks
+ * the in-memory store and either returns a cached response or processes the
+ * request and caches the outcome.
+ */
+function withIdempotency(
+  handler: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<any>
+): (req: express.Request, res: express.Response, next: express.NextFunction) => void {
+  return (req, res, next) => {
+    const idempotencyKey = req.headers["x-idempotency-key"] as string | undefined;
+
+    // If no key provided, run handler normally (no idempotency)
+    if (!idempotencyKey) {
+      handler(req, res, next).catch(next);
+      return;
+    }
+
+    const existing = idempotencyStore.get(idempotencyKey);
+    if (existing) {
+      if (existing.status === "processing") {
+        res.status(409).json({ error: "Request with this idempotency key is already being processed" });
+        return;
+      }
+      if (existing.status === "done") {
+        res.status(existing.statusCode || 200).json(existing.result);
+        return;
+      }
+      if (existing.status === "error") {
+        res.status(existing.statusCode || 500).json(existing.result);
+        return;
+      }
+    }
+
+    // Mark as processing
+    idempotencyStore.set(idempotencyKey, { status: "processing", timestamp: Date.now() });
+
+    // Intercept res.json to capture the response
+    const originalJson = res.json.bind(res);
+    res.json = (body: any) => {
+      const code = res.statusCode || 200;
+      if (code >= 200 && code < 400) {
+        idempotencyStore.set(idempotencyKey, {
+          status: "done",
+          statusCode: code,
+          result: body,
+          timestamp: Date.now(),
+        });
+      } else {
+        idempotencyStore.set(idempotencyKey, {
+          status: "error",
+          statusCode: code,
+          result: body,
+          timestamp: Date.now(),
+        });
+      }
+      return originalJson(body);
+    };
+
+    handler(req, res, next).catch((err) => {
+      idempotencyStore.set(idempotencyKey, {
+        status: "error",
+        statusCode: 500,
+        result: { error: err.message || "Internal server error" },
+        timestamp: Date.now(),
+      });
+      next(err);
+    });
+  };
+}
+
 // ============ PDA Derivation ============
 
 function findStablecoinPDA(mint: PublicKey): [PublicKey, number] {
@@ -419,7 +522,7 @@ app.get("/api/v1/audit-log", (req, res) => {
 // ============ Write Endpoints (auth required, request -> verify -> execute -> log) ============
 
 // Mint
-app.post("/api/v1/mint", authMiddleware, async (req, res) => {
+app.post("/api/v1/mint", authMiddleware, withIdempotency(async (req, res) => {
   const reference = req.body.reference || `mint_${Date.now()}`;
   try {
     const { recipient, amount } = req.body;
@@ -473,10 +576,10 @@ app.post("/api/v1/mint", authMiddleware, async (req, res) => {
     });
     res.status(500).json({ error: error.message, reference });
   }
-});
+}));
 
 // Burn
-app.post("/api/v1/burn", authMiddleware, async (req, res) => {
+app.post("/api/v1/burn", authMiddleware, withIdempotency(async (req, res) => {
   const reference = req.body.reference || `burn_${Date.now()}`;
   try {
     const { amount, from } = req.body;
@@ -529,10 +632,10 @@ app.post("/api/v1/burn", authMiddleware, async (req, res) => {
     });
     res.status(500).json({ error: error.message, reference });
   }
-});
+}));
 
 // Blacklist add
-app.post("/api/v1/compliance/blacklist", authMiddleware, async (req, res) => {
+app.post("/api/v1/compliance/blacklist", authMiddleware, withIdempotency(async (req, res) => {
   const reference = req.body.reference || `blacklist_add_${Date.now()}`;
   try {
     const { address, reason } = req.body;
@@ -581,7 +684,7 @@ app.post("/api/v1/compliance/blacklist", authMiddleware, async (req, res) => {
     });
     res.status(500).json({ error: error.message, reference });
   }
-});
+}));
 
 // Blacklist remove
 app.delete("/api/v1/compliance/blacklist/:address", authMiddleware, async (req, res) => {
@@ -631,7 +734,7 @@ app.delete("/api/v1/compliance/blacklist/:address", authMiddleware, async (req, 
 });
 
 // Seize — fetches source token account owner for correct blacklist PDA derivation
-app.post("/api/v1/compliance/seize", authMiddleware, async (req, res) => {
+app.post("/api/v1/compliance/seize", authMiddleware, withIdempotency(async (req, res) => {
   const reference = req.body.reference || `seize_${Date.now()}`;
   try {
     const { from, treasury } = req.body;
@@ -695,10 +798,10 @@ app.post("/api/v1/compliance/seize", authMiddleware, async (req, res) => {
     });
     res.status(500).json({ error: error.message, reference });
   }
-});
+}));
 
 // Update Metadata
-app.post("/api/v1/metadata", authMiddleware, async (req, res) => {
+app.post("/api/v1/metadata", authMiddleware, withIdempotency(async (req, res) => {
   const reference = req.body.reference || `metadata_${Date.now()}`;
   try {
     const { uri } = req.body;
@@ -743,7 +846,7 @@ app.post("/api/v1/metadata", authMiddleware, async (req, res) => {
     });
     res.status(500).json({ error: error.message, reference });
   }
-});
+}));
 
 // ============ Webhook Management (auth required, persisted to disk) ============
 

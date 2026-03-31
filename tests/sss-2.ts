@@ -216,9 +216,9 @@ describe("SSS-2: Compliant Stablecoin", () => {
 
     console.log("  Blacklist remove tx:", tx);
 
-    // Verify entry deactivated (audit trail preserved)
-    const entry = await program.account.blacklistEntry.fetch(blacklistPDA);
-    expect(entry.active).to.be.false;
+    // Account is now closed (deactivated + rent reclaimed in one tx)
+    const info = await provider.connection.getAccountInfo(blacklistPDA);
+    expect(info).to.be.null;
   });
 
   it("seizes tokens from blacklisted account", async () => {

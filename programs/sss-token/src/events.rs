@@ -171,6 +171,34 @@ pub struct MetadataUpdated {
     pub timestamp: i64,
 }
 
+/// Emitted when a blacklist entry account is closed and rent reclaimed.
+#[event]
+pub struct BlacklistEntryClosed {
+    pub mint: Pubkey,
+    pub address: Pubkey,
+    pub closed_by: Pubkey,
+    pub timestamp: i64,
+}
+
+/// Emitted when a role assignment account is closed and rent reclaimed.
+#[event]
+pub struct RoleClosed {
+    pub mint: Pubkey,
+    pub role: String,
+    pub assignee: Pubkey,
+    pub closed_by: Pubkey,
+    pub timestamp: i64,
+}
+
+/// Emitted when a minter info account is closed and rent reclaimed.
+#[event]
+pub struct MinterInfoClosed {
+    pub mint: Pubkey,
+    pub minter: Pubkey,
+    pub closed_by: Pubkey,
+    pub timestamp: i64,
+}
+
 /// Emitted when oracle price enforcement is configured.
 #[event]
 pub struct OracleConfigured {

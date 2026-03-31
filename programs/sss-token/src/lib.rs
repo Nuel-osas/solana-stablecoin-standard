@@ -110,6 +110,17 @@ pub mod sss_token {
         instructions::roles::set_supply_cap_handler(ctx, supply_cap)
     }
 
+    /// Close a revoked (inactive) role assignment account and reclaim rent.
+    /// Only master authority.
+    pub fn close_role(ctx: Context<CloseRole>, role: Role, assignee: Pubkey) -> Result<()> {
+        instructions::roles::close_role_handler(ctx, role, assignee)
+    }
+
+    /// Close a minter info account and reclaim rent. Only master authority.
+    pub fn close_minter_info(ctx: Context<CloseMinterInfo>) -> Result<()> {
+        instructions::roles::close_minter_info_handler(ctx)
+    }
+
     // ============ SSS-2 Compliance Operations ============
 
     /// Add an address to the blacklist. Caller must have blacklister role.
@@ -122,9 +133,16 @@ pub mod sss_token {
         instructions::compliance::add_to_blacklist_handler(ctx, address, reason)
     }
 
-    /// Remove an address from the blacklist. Caller must have blacklister role.
+    /// Remove an address from the blacklist and close the account to reclaim rent.
+    /// Caller must have blacklister role.
     pub fn remove_from_blacklist(ctx: Context<BlacklistRemove>, address: Pubkey) -> Result<()> {
         instructions::compliance::remove_from_blacklist_handler(ctx, address)
+    }
+
+    /// Close an already-deactivated blacklist entry to reclaim rent.
+    /// Use when an entry was previously deactivated but the account was not closed.
+    pub fn close_blacklist_entry(ctx: Context<CloseBlacklistEntry>, address: Pubkey) -> Result<()> {
+        instructions::compliance::close_blacklist_entry_handler(ctx, address)
     }
 
     /// Seize tokens from a frozen/blacklisted account via permanent delegate.
